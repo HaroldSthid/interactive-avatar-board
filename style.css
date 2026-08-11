@@ -200,6 +200,13 @@ button {
   font-size: 0.85rem;
 }
 
+.field__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-neon-red);
+  min-height: 1em;
+}
+
 /* ==========================================================================
    Buttons
    ========================================================================== */
@@ -368,6 +375,15 @@ button {
   font-size: 0.6rem;
   color: var(--color-text);
   transition: transform 0.6s ease-out, border-color 0.3s ease, background-color 0.3s ease;
+}
+
+/* Real (network-joined) students who upload a JPG photo instead of picking
+   a preset avatar: the token shows the photo as a circular background
+   image, keeping the same token size/position/animation logic above. */
+.avatar-token--photo {
+  background-size: cover;
+  background-position: center;
+  color: transparent;
 }
 
 .avatar-token[data-submitted='true'] {

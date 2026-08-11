@@ -53,6 +53,11 @@
               <option value="star-ranger">Star Ranger</option>
             </select>
           </label>
+          <label class="field">
+            <span class="field__label">O subí tu foto (JPG, opcional)</span>
+            <input type="file" id="input-avatar-upload" class="field__input" accept="image/jpeg" />
+          </label>
+          <p id="avatar-upload-status" class="field__hint" aria-live="polite"></p>
           <button type="submit" class="btn btn--secondary">Join Board</button>
         </form>
       </div>
@@ -139,6 +144,7 @@
 
   <!-- PeerJS CDN (P2P data sync) -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="questions.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

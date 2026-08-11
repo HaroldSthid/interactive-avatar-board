@@ -92,12 +92,33 @@ function initViewToggles() {
       const roomInput = document.getElementById('input-join-room');
       const studentIdInput = document.getElementById('input-student-id');
       const avatarInput = document.getElementById('input-avatar');
+      const avatarUploadInput = document.getElementById('input-avatar-upload');
 
       const roomId = roomInput ? roomInput.value.trim() : '';
       const studentId = studentIdInput ? studentIdInput.value.trim() : '';
       const avatar = avatarInput ? avatarInput.value : MOCK_AVATARS[0];
+      const uploadedFile = avatarUploadInput && avatarUploadInput.files ? avatarUploadInput.files[0] : null;
 
       if (!roomId || !studentId) return;
+
+      if (uploadedFile) {
+        const validationError = validateAvatarUploadFile(uploadedFile);
+        if (validationError) {
+          setAvatarUploadStatus(validationError);
+          return;
+        }
+        setAvatarUploadStatus('');
+        readAvatarUploadAsDataUrl(uploadedFile)
+          .then((avatarImage) => {
+            setControllerStatus(`Student: ${studentId} (connecting...)`);
+            navigateTo('controller');
+            joinRoom(roomId, studentId, avatar, avatarImage);
+          })
+          .catch(() => {
+            setAvatarUploadStatus('No se pudo leer la foto. Probá de nuevo.');
+          });
+        return;
+      }
 
       setControllerStatus(`Student: ${studentId} (connecting...)`);
       navigateTo('controller');
@@ -146,9 +167,10 @@ const SIMULATOR_MAX_DELAY_MS = 4000;
 const gameState = {
   current: GAME_STATES.LOBBY,
   simulatorEnabled: false,
-  students: [], // { id, name, avatar, isMock }
+  students: [], // { id, name, avatar, avatarImage, isMock }
   questionStartedAt: null,
   questionId: 0,
+  questionIndex: 0, // index into QUESTIONS (questions.js), advances each new round
   correctAnswer: null, // host-designated correct quadrant for the active question
   submissions: [], // { studentId, choice, timestamp }
   lastLeaderboard: [], // [{ studentId, speedMs }], ranked ascending, correct answers only
@@ -265,6 +287,21 @@ function startNewQuestionRound() {
   resetAvatarPositions();
   setGameState(GAME_STATES.ACTIVE_QUESTION);
 
+  // Pull the next question from the pre-configured bank (questions.js),
+  // wrapping back to the start once exhausted, and pre-fill the host's
+  // "Correct Answer" select from it (still overridable manually afterwards).
+  const bank = typeof QUESTIONS !== 'undefined' && QUESTIONS.length > 0 ? QUESTIONS : null;
+  const question = bank ? bank[gameState.questionIndex % bank.length] : null;
+
+  if (question) {
+    gameState.correctAnswer = question.correctAnswer;
+    const selectCorrectAnswer = document.getElementById('input-correct-answer');
+    if (selectCorrectAnswer) {
+      selectCorrectAnswer.value = question.correctAnswer || '';
+    }
+    gameState.questionIndex += 1;
+  }
+
   if (gameState.simulatorEnabled) {
     scheduleSimulatedSubmissions();
   }
@@ -273,8 +310,8 @@ function startNewQuestionRound() {
     type: MSG_TYPES.START_QUESTION,
     payload: {
       questionId: gameState.questionId,
-      text: 'New question! Choose your answer.',
-      options: QUADRANTS,
+      text: question ? question.text : 'New question! Choose your answer.',
+      options: question ? question.options : QUADRANTS,
       startedAt: gameState.questionStartedAt,
     },
   });
@@ -323,6 +360,7 @@ function resetGame() {
   gameState.lastLeaderboard = [];
   gameState.questionStartedAt = null;
   gameState.questionId = 0;
+  gameState.questionIndex = 0;
   gameState.correctAnswer = null;
   const selectCorrectAnswer = document.getElementById('input-correct-answer');
   if (selectCorrectAnswer) {
@@ -467,7 +505,17 @@ function syncAvatarTokens() {
       token.dataset.submitted = 'false';
       token.title = student.id;
       token.dataset.tooltip = student.id;
-      token.textContent = student.id.slice(0, 2).toUpperCase();
+
+      if (student.avatarImage) {
+        // Real (network-joined) student with an uploaded JPG photo: render
+        // the photo instead of the initials badge. Preset/mock students are
+        // unaffected — they keep the existing initials-based rendering.
+        token.classList.add('avatar-token--photo');
+        token.style.backgroundImage = `url("${student.avatarImage}")`;
+      } else {
+        token.textContent = student.id.slice(0, 2).toUpperCase();
+      }
+
       startingLine.appendChild(token);
     }
 
@@ -645,6 +693,48 @@ function setControllerStatus(text) {
   if (tag) tag.textContent = text;
 }
 
+// ---------------------------------------------------------------------------
+// Optional JPG avatar upload (student join form)
+// ---------------------------------------------------------------------------
+
+const AVATAR_UPLOAD_MAX_BYTES = 300 * 1024; // ~300KB, kept small for a P2P demo
+
+function setAvatarUploadStatus(text) {
+  const el = document.getElementById('avatar-upload-status');
+  if (el) el.textContent = text;
+}
+
+/**
+ * Client-side validation for the optional avatar photo upload: must be a
+ * JPEG and no larger than AVATAR_UPLOAD_MAX_BYTES.
+ * @param {File} file
+ * @returns {string|null} an error message, or null if the file is valid
+ */
+function validateAvatarUploadFile(file) {
+  if (file.type !== 'image/jpeg') {
+    return 'La foto debe ser un archivo JPG.';
+  }
+  if (file.size > AVATAR_UPLOAD_MAX_BYTES) {
+    return 'La foto es muy pesada (máx. ~300KB).';
+  }
+  return null;
+}
+
+/**
+ * Reads a File as a base64 data URL, for embedding directly in the JOIN
+ * message payload sent over the PeerJS data channel.
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+function readAvatarUploadAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * Initializes the host's PeerJS Peer with a generated Room ID and opens a
  * listener for incoming student connections. Retries with a new Room ID on
@@ -722,9 +812,9 @@ function handleHostMessage(conn, message) {
 
   switch (message.type) {
     case MSG_TYPES.JOIN: {
-      const { studentId, avatar } = message.payload || {};
+      const { studentId, avatar, avatarImage } = message.payload || {};
       if (!studentId) return;
-      registerRealStudent(conn, studentId, avatar);
+      registerRealStudent(conn, studentId, avatar, avatarImage);
       break;
     }
     case MSG_TYPES.SUBMIT: {
@@ -746,14 +836,17 @@ function handleHostMessage(conn, message) {
  * @param {DataConnection} conn
  * @param {string} studentId
  * @param {string} [avatar]
+ * @param {string} [avatarImage] - optional base64 data URL uploaded by the
+ *   student; when present, rendering prefers it over the preset `avatar`.
  */
-function registerRealStudent(conn, studentId, avatar) {
+function registerRealStudent(conn, studentId, avatar, avatarImage) {
   const alreadyRegistered = gameState.students.some((student) => student.id === studentId);
   if (!alreadyRegistered) {
     gameState.students.push({
       id: studentId,
       name: studentId,
       avatar: avatar || MOCK_AVATARS[0],
+      avatarImage: avatarImage || null,
       isMock: false,
     });
   }
@@ -788,8 +881,11 @@ function broadcastToStudents(message) {
  * @param {string} roomId
  * @param {string} studentId
  * @param {string} avatar
+ * @param {string} [avatarImage] - optional base64 data URL of an uploaded
+ *   JPG photo; takes precedence over `avatar` on the rendering side when
+ *   present.
  */
-function joinRoom(roomId, studentId, avatar) {
+function joinRoom(roomId, studentId, avatar, avatarImage) {
   if (typeof Peer === 'undefined') {
     setControllerStatus('PeerJS unavailable');
     return;
@@ -804,7 +900,7 @@ function joinRoom(roomId, studentId, avatar) {
     gameState.hostConnection = conn;
 
     conn.on('open', () => {
-      conn.send({ type: MSG_TYPES.JOIN, payload: { studentId, avatar } });
+      conn.send({ type: MSG_TYPES.JOIN, payload: { studentId, avatar, avatarImage } });
     });
 
     conn.on('data', (data) => handleClientMessage(data));
@@ -838,6 +934,7 @@ function handleClientMessage(message) {
       gameState.controllerCurrentQuestionId = message.payload && message.payload.questionId;
       gameState.controllerHasSubmitted = false;
       setControllerQuestionText((message.payload && message.payload.text) || 'Choose your answer!');
+      setControllerOptionLabels(message.payload && message.payload.options);
       setControllerOptionsEnabled(true);
       break;
     }
@@ -854,6 +951,22 @@ function handleClientMessage(message) {
 function setControllerQuestionText(text) {
   const el = document.getElementById('controller-question-text');
   if (el) el.textContent = text;
+}
+
+/**
+ * Renders the real per-quadrant answer text on the controller's A/B/C/D
+ * buttons when the host broadcasts a question-bank question (an `options`
+ * object shaped like `{ A: 'text', B: 'text', ... }`). Falls back to the
+ * bare quadrant letter when `options` is missing or is the legacy
+ * QUADRANTS array shape.
+ * @param {object|Array<string>} [options]
+ */
+function setControllerOptionLabels(options) {
+  document.querySelectorAll('.controller-option').forEach((btn) => {
+    const choice = btn.dataset.choice;
+    const label = options && !Array.isArray(options) ? options[choice] : null;
+    btn.textContent = label ? `${choice}. ${label}` : choice;
+  });
 }
 
 function setControllerOptionsEnabled(enabled) {
