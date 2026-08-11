@@ -62,11 +62,11 @@ Hay que editar **los dos archivos**, usando el **mismo `id`** en ambos:
 
 3. Si el `id` no coincide entre los dos archivos, esa pregunta no va a tener respuesta correcta cargada automáticamente (el dropdown "Correct Answer" del panel del docente queda vacío para esa ronda, pero se puede elegir a mano igual).
 
-El juego recorre `QUESTIONS_PUBLIC` en orden (y vuelve al principio si se acaban) cada vez que arranca una nueva ronda, sin tocar `app.js`.
+El juego arranca con **20 preguntas de ejemplo**. El orden es **aleatorio** (no repite ninguna hasta usar las 20), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas que quieras siguiendo el mismo formato, sin tocar `app.js`.
 
 ## Limitaciones conocidas
 
-- Depende del servidor de señalización público de PeerJS (puede fallar o tener latencia si ese servicio tiene problemas).
+- Depende del servidor de señalización público de PeerJS (puede fallar o tener latencia si ese servicio tiene problemas). Si tenés estudiantes en redes distintas (WiFi de la escuela + datos móviles) o el WiFi tiene "aislamiento de clientes", agregamos un servidor TURN de respaldo — probá primero con pocos dispositivos antes de la clase completa.
 - Si un estudiante real se une **después** de activar el simulador, el simulador no genera estudiantes mock nuevos (no se mezclan automáticamente).
 - No hay manejo robusto de desconexión: si un estudiante pierde la conexión, su avatar no se limpia ni se marca automáticamente.
 - La separación entre `questions-public.js` y `answers.json` es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.

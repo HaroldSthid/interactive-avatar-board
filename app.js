@@ -178,7 +178,15 @@ const gameState = {
   students: [], // { id, name, avatar, avatarImage, isMock }
   questionStartedAt: null,
   questionId: 0,
-  questionIndex: 0, // index into QUESTIONS_PUBLIC (questions-public.js), advances each new round
+  // Shuffle-bag ordering over QUESTIONS_PUBLIC: questionOrder holds a
+  // shuffled permutation of bank indices, questionPointer advances through
+  // it. Every question is shown exactly once before any repeats, and the
+  // bag reshuffles (with a fresh random order) once exhausted — see
+  // drawNextQuestion(). Avoids the same fixed 1,2,3...N,1,2,3 repeat cycle
+  // a plain index would produce, which becomes predictable/repetitive fast
+  // in a real class with more rounds than questions in the bank.
+  questionOrder: [],
+  questionPointer: 0,
   correctAnswer: null, // host-designated correct quadrant for the active question
   submissions: [], // { studentId, choice, timestamp }
   lastLeaderboard: [], // [{ studentId, speedMs }], ranked ascending, correct answers only
@@ -286,6 +294,41 @@ function recordSubmission(studentId, choice, timestamp = Date.now()) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Fisher-Yates shuffle, returns a new array (does not mutate the input).
+ * @param {Array} array
+ */
+function shuffleArray(array) {
+  const result = array.slice();
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/**
+ * Draws the next question from QUESTIONS_PUBLIC using a shuffle bag: a
+ * freshly shuffled permutation of bank indices is consumed one at a time,
+ * guaranteeing every question appears exactly once before any repeats. Once
+ * the bag is exhausted (or the bank size changed, e.g. after editing
+ * questions-public.js), it's reshuffled with a new random order.
+ * @returns {object|null} the next question object, or null if the bank is empty/missing
+ */
+function drawNextQuestion() {
+  const bank = typeof QUESTIONS_PUBLIC !== 'undefined' && QUESTIONS_PUBLIC.length > 0 ? QUESTIONS_PUBLIC : null;
+  if (!bank) return null;
+
+  if (gameState.questionOrder.length !== bank.length || gameState.questionPointer >= gameState.questionOrder.length) {
+    gameState.questionOrder = shuffleArray(bank.map((_, i) => i));
+    gameState.questionPointer = 0;
+  }
+
+  const bankIndex = gameState.questionOrder[gameState.questionPointer];
+  gameState.questionPointer += 1;
+  return bank[bankIndex];
+}
+
+/**
  * Starts a fresh ACTIVE_QUESTION round: resets submissions/avatar positions,
  * broadcasts START_QUESTION to connected students, and (re-)arms the
  * simulator when enabled. Shared by startGame() and the LEADERBOARD ->
@@ -300,12 +343,11 @@ function startNewQuestionRound() {
   setGameState(GAME_STATES.ACTIVE_QUESTION);
 
   // Pull the next question from the pre-configured public bank
-  // (questions-public.js), wrapping back to the start once exhausted, and
+  // (questions-public.js) via the shuffle bag (drawNextQuestion), and
   // pre-fill the host's "Correct Answer" select by looking up the answer key
   // (answers.json, fetched lazily in initHostPeer()) — still overridable
   // manually afterwards.
-  const bank = typeof QUESTIONS_PUBLIC !== 'undefined' && QUESTIONS_PUBLIC.length > 0 ? QUESTIONS_PUBLIC : null;
-  const question = bank ? bank[gameState.questionIndex % bank.length] : null;
+  const question = drawNextQuestion();
 
   if (question) {
     const correctAnswer = gameState.answerKey ? gameState.answerKey[question.id] : undefined;
@@ -317,7 +359,6 @@ function startNewQuestionRound() {
     if (selectCorrectAnswer) {
       selectCorrectAnswer.value = correctAnswer || '';
     }
-    gameState.questionIndex += 1;
   }
 
   if (gameState.simulatorEnabled) {
@@ -378,7 +419,8 @@ function resetGame() {
   gameState.lastLeaderboard = [];
   gameState.questionStartedAt = null;
   gameState.questionId = 0;
-  gameState.questionIndex = 0;
+  gameState.questionOrder = [];
+  gameState.questionPointer = 0;
   gameState.correctAnswer = null;
   const selectCorrectAnswer = document.getElementById('input-correct-answer');
   if (selectCorrectAnswer) {

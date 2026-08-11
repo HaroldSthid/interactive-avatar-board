@@ -60,4 +60,64 @@ const QUESTIONS_PUBLIC = [
     text: '¿Quién pintó la Mona Lisa?',
     options: { A: 'Pablo Picasso', B: 'Leonardo da Vinci', C: 'Vincent van Gogh', D: 'Miguel Ángel' },
   },
+  {
+    id: 9,
+    text: '¿Cuál es el océano más grande del mundo?',
+    options: { A: 'Atlántico', B: 'Índico', C: 'Pacífico', D: 'Ártico' },
+  },
+  {
+    id: 10,
+    text: '¿Cuánto es 12 x 6?',
+    options: { A: '66', B: '72', C: '78', D: '84' },
+  },
+  {
+    id: 11,
+    text: '¿Quién escribió "Don Quijote de la Mancha"?',
+    options: { A: 'Miguel de Cervantes', B: 'Gabriel García Márquez', C: 'Jorge Luis Borges', D: 'Pablo Neruda' },
+  },
+  {
+    id: 12,
+    text: '¿Cuál es el hueso más largo del cuerpo humano?',
+    options: { A: 'Húmero', B: 'Fémur', C: 'Tibia', D: 'Radio' },
+  },
+  {
+    id: 13,
+    text: '¿En qué continente está Egipto?',
+    options: { A: 'Asia', B: 'Europa', C: 'África', D: 'Oceanía' },
+  },
+  {
+    id: 14,
+    text: '¿Cuál es el resultado de 15 - 7?',
+    options: { A: '6', B: '7', C: '8', D: '9' },
+  },
+  {
+    id: 15,
+    text: '¿Cuál es la moneda oficial de Japón?',
+    options: { A: 'Yuan', B: 'Won', C: 'Yen', D: 'Ringgit' },
+  },
+  {
+    id: 16,
+    text: '¿Qué planeta es conocido como el planeta rojo?',
+    options: { A: 'Venus', B: 'Marte', C: 'Júpiter', D: 'Saturno' },
+  },
+  {
+    id: 17,
+    text: '¿Cuántos lados tiene un hexágono?',
+    options: { A: '5', B: '6', C: '7', D: '8' },
+  },
+  {
+    id: 18,
+    text: '¿Quién fue el primer presidente de Argentina?',
+    options: { A: 'Bernardino Rivadavia', B: 'Domingo Sarmiento', C: 'Julio A. Roca', D: 'Justo José de Urquiza' },
+  },
+  {
+    id: 19,
+    text: '¿Cuál es el metal líquido a temperatura ambiente?',
+    options: { A: 'Hierro', B: 'Mercurio', C: 'Aluminio', D: 'Plomo' },
+  },
+  {
+    id: 20,
+    text: '¿Cuánto es la mitad de 90?',
+    options: { A: '40', B: '45', C: '35', D: '50' },
+  },
 ];
