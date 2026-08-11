@@ -446,14 +446,20 @@ button {
   animation: submit-pop 0.5s ease-out;
 }
 
+/* background-color (not the `background` shorthand) on purpose: the
+   shorthand resets background-image/position/size to their defaults,
+   which clobbered .avatar-token--photo's `background-size: cover;
+   background-position: center;` the moment a round ended (data-correct
+   set) — pixel-art/uploaded avatars would jump from centered-and-cropped
+   to their raw top-left corner, looking "shifted"/cut off. */
 .avatar-token[data-correct='true'] {
   border-color: var(--color-neon-green);
-  background: rgba(57, 255, 136, 0.15);
+  background-color: rgba(57, 255, 136, 0.15);
 }
 
 .avatar-token[data-correct='false'] {
   border-color: var(--color-neon-red);
-  background: rgba(255, 56, 96, 0.15);
+  background-color: rgba(255, 56, 96, 0.15);
 }
 
 .board-leaderboard {
