@@ -207,6 +207,26 @@ button {
   min-height: 1em;
 }
 
+.field--avatar-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.field--avatar-picker .field__input {
+  flex: 1;
+}
+
+.avatar-preview {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--color-neon-magenta);
+  object-fit: cover;
+  background: var(--color-bg-panel-alt);
+}
+
 /* ==========================================================================
    Buttons
    ========================================================================== */

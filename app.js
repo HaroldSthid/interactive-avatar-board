@@ -72,6 +72,16 @@ function initViewToggles() {
   const formStudent = document.getElementById('form-student');
   const btnBackToSetupBoard = document.getElementById('btn-back-to-setup-board');
   const btnBackToSetupController = document.getElementById('btn-back-to-setup-controller');
+  const avatarSelect = document.getElementById('input-avatar');
+  const avatarPreview = document.getElementById('avatar-preview');
+
+  // Live-updates the pixel-art preview image as the student browses presets.
+  if (avatarSelect && avatarPreview) {
+    avatarSelect.addEventListener('change', () => {
+      const path = AVATAR_IMAGE_PATHS[avatarSelect.value];
+      if (path) avatarPreview.src = path;
+    });
+  }
 
   // Host form: initializes the PeerJS host peer (Room ID + listener) and
   // navigates to the Board view once the connection is open.
@@ -159,6 +169,15 @@ const GAME_STATES = {
 
 const QUADRANTS = ['A', 'B', 'C', 'D'];
 const MOCK_AVATARS = ['hero-knight', 'shadow-ninja', 'cyber-mage', 'star-ranger'];
+// Preset pixel-art avatar images (original tech-hero designs, see avatars/
+// folder) — one per MOCK_AVATARS id. Used for both the offline simulator's
+// mock students and real students who didn't upload their own JPG photo.
+const AVATAR_IMAGE_PATHS = {
+  'hero-knight': 'avatars/hero-knight.jpg',
+  'shadow-ninja': 'avatars/shadow-ninja.jpg',
+  'cyber-mage': 'avatars/cyber-mage.jpg',
+  'star-ranger': 'avatars/star-ranger.jpg',
+};
 const MOCK_NAME_POOL = [
   'Aiko', 'Bram', 'Cass', 'Dex', 'Enzo', 'Fina', 'Goro', 'Hana',
   'Ivo', 'Juno', 'Kade', 'Lira', 'Milo', 'Nyx', 'Ori', 'Piko',
@@ -630,12 +649,14 @@ function syncAvatarTokens() {
       token.title = student.id;
       token.dataset.tooltip = student.id;
 
-      if (student.avatarImage) {
-        // Real (network-joined) student with an uploaded JPG photo: render
-        // the photo instead of the initials badge. Preset/mock students are
-        // unaffected — they keep the existing initials-based rendering.
+      // Precedence: a student's own uploaded JPG photo, then the pixel-art
+      // preset image matching their chosen avatar, then (only if neither is
+      // available) the plain initials badge as a last-resort fallback.
+      const presetImage = AVATAR_IMAGE_PATHS[student.avatar];
+      const imageSrc = student.avatarImage || presetImage;
+      if (imageSrc) {
         token.classList.add('avatar-token--photo');
-        token.style.backgroundImage = `url("${student.avatarImage}")`;
+        token.style.backgroundImage = `url("${imageSrc}")`;
       } else {
         token.textContent = student.id.slice(0, 2).toUpperCase();
       }

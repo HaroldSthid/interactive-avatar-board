@@ -21,7 +21,7 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 2. Andá a **"Join a Board"**.
 3. Pegá el **Room ID** que te pasó el docente.
 4. Poné tu nombre o ID de estudiante.
-5. Elegí un avatar de la lista **o** subí tu propia foto en JPG (opcional). Cualquier foto real sacada con el celular sirve — se achica y comprime automáticamente en el navegador antes de enviarse, así que no hay que preocuparse por el tamaño del archivo original.
+5. Elegí uno de los 4 avatares pixel-art (diseños originales tipo héroe tech, ver previsualización al lado del selector) **o** subí tu propia foto en JPG (opcional, tiene prioridad sobre el avatar elegido si la subís). Cualquier foto real sacada con el celular sirve — se achica y comprime automáticamente en el navegador antes de enviarse, así que no hay que preocuparse por el tamaño del archivo original.
 6. Click en **"Join Board"**.
 7. Esperá a que el docente arranque la pregunta.
 8. Tocá A, B, C o D antes que el resto — la velocidad de respuesta define el ranking.
