@@ -12,7 +12,8 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 4. Opcional: click en **"Simulator: On"** para armar una demo/prueba rápida con estudiantes simulados, sin necesitar conexiones reales.
 5. Click en **"Start Game"** para arrancar la primera pregunta del banco.
 6. Click en **"Next Question"** para avanzar a la siguiente pregunta.
-7. Click en **"Reset"** para reiniciar toda la sesión (vuelve al banco de preguntas desde el principio).
+7. Click en **"Finalizar sesión"** en cualquier momento (excepto en LOBBY) para cerrar la sesión y mostrar el ranking final acumulado, tanto en el board como en el celular de cada estudiante.
+8. Click en **"Reset"** para reiniciar toda la sesión (vuelve al banco de preguntas desde el principio y borra el puntaje acumulado), incluso después de "Finalizar sesión".
 
 ## Instrucciones para el estudiante
 
@@ -24,6 +25,14 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 6. Click en **"Join Board"**.
 7. Esperá a que el docente arranque la pregunta.
 8. Tocá A, B, C o D antes que el resto — la velocidad de respuesta define el ranking.
+
+## Puntaje acumulado y ranking final
+
+Además del ranking de velocidad de cada ronda (que se muestra y se descarta en cada vuelta), el juego lleva un **puntaje acumulado por estudiante** a lo largo de toda la sesión.
+
+**Regla de puntaje** (simple, fácil de explicar en clase): en cada ronda, entre los estudiantes que respondieron **correcto**, si hubo `N` respuestas correctas, el más rápido se lleva `N` puntos, el segundo más rápido `N-1`, y así hasta el último correcto, que se lleva `1` punto. Quien respondió mal o no respondió, `0` puntos esa ronda. Esos puntos se suman al total acumulado del estudiante en toda la sesión.
+
+Al clickear **"Finalizar sesión"**, el docente cierra la sesión y se muestra el **ranking final** (ordenado de mayor a menor puntaje acumulado, con el ganador destacado) tanto en el board del docente como en la pantalla de cada estudiante conectado. Los estudiantes que nunca sumaron puntos igual aparecen en el ranking (al final), para que el docente vea el panorama completo de la clase, no solo a los que puntuaron.
 
 ## Cómo editar el banco de preguntas
 

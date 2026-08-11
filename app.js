@@ -154,6 +154,7 @@ const GAME_STATES = {
   LOBBY: 'LOBBY',
   ACTIVE_QUESTION: 'ACTIVE_QUESTION',
   LEADERBOARD: 'LEADERBOARD',
+  SESSION_END: 'SESSION_END',
 };
 
 const QUADRANTS = ['A', 'B', 'C', 'D'];
@@ -191,6 +192,11 @@ const gameState = {
   submissions: [], // { studentId, choice, timestamp }
   lastLeaderboard: [], // [{ studentId, speedMs }], ranked ascending, correct answers only
   pendingTimers: [],
+  // Cumulative session score per student (studentId -> number). Awarded
+  // round-by-round in nextQuestion() — see the scoring rule documented
+  // there — and reset alongside the rest of the session in resetGame().
+  totalScores: {},
+  finalRanking: [], // [{ studentId, score }], set by endSession(), descending by score
 
   // --- PeerJS (Phase 3) ---
   peer: null, // host: this device's PeerJS Peer instance
@@ -394,8 +400,9 @@ function nextQuestion() {
     const leaderboard = computeLeaderboard();
     gameState.lastLeaderboard = leaderboard;
     markRoundResults(leaderboard);
+    awardRoundPoints(leaderboard);
     setGameState(GAME_STATES.LEADERBOARD);
-    broadcastToStudents({ type: MSG_TYPES.ROUND_END, payload: { leaderboard } });
+    broadcastToStudents({ type: MSG_TYPES.ROUND_END, payload: { leaderboard, totalScores: gameState.totalScores } });
     return;
   }
 
@@ -422,6 +429,11 @@ function resetGame() {
   gameState.questionOrder = [];
   gameState.questionPointer = 0;
   gameState.correctAnswer = null;
+  // Full session reset wipes cumulative scores too, same as the question
+  // cycling state above — Reset always means "start a completely new
+  // session", even when triggered from SESSION_END.
+  gameState.totalScores = {};
+  gameState.finalRanking = [];
   const selectCorrectAnswer = document.getElementById('input-correct-answer');
   if (selectCorrectAnswer) {
     selectCorrectAnswer.value = '';
@@ -454,6 +466,7 @@ function renderDashboard() {
   const btnStart = document.getElementById('btn-start-game');
   const btnNext = document.getElementById('btn-next-question');
   const btnSimulator = document.getElementById('btn-toggle-simulator');
+  const btnEndSession = document.getElementById('btn-end-session');
   const boardTrack = document.getElementById('board-track');
 
   if (stateLabel) {
@@ -472,7 +485,8 @@ function renderDashboard() {
   }
 
   if (btnNext) {
-    btnNext.disabled = gameState.current === GAME_STATES.LOBBY;
+    // Session is over: only Reset should be usable to start a fresh one.
+    btnNext.disabled = gameState.current === GAME_STATES.LOBBY || gameState.current === GAME_STATES.SESSION_END;
     btnNext.textContent = gameState.current === GAME_STATES.LEADERBOARD ? 'Next Question' : 'End Question';
   }
 
@@ -480,7 +494,14 @@ function renderDashboard() {
     btnSimulator.textContent = `Simulator: ${gameState.simulatorEnabled ? 'On' : 'Off'}`;
   }
 
+  if (btnEndSession) {
+    // Usable any time except LOBBY (nothing to end yet) and SESSION_END
+    // (already ended).
+    btnEndSession.disabled = gameState.current === GAME_STATES.LOBBY || gameState.current === GAME_STATES.SESSION_END;
+  }
+
   renderLeaderboardPanel();
+  renderFinalRankingPanel();
 }
 
 /**
@@ -513,6 +534,49 @@ function renderLeaderboardPanel() {
   gameState.lastLeaderboard.forEach((entry) => {
     const item = document.createElement('li');
     item.textContent = `${entry.studentId} — ${entry.speedMs}ms`;
+    list.appendChild(item);
+  });
+  panel.appendChild(list);
+}
+
+/**
+ * Renders (or hides, outside SESSION_END) the final cumulative ranking for
+ * the whole session, computed by endSession(). Mirrors the round
+ * leaderboard's markup/styling patterns (an <ol> reusing `.leaderboard__list`
+ * so the winner-highlight CSS applies), with a trophy prefix on the #1 entry.
+ */
+function renderFinalRankingPanel() {
+  const panel = document.getElementById('board-final-ranking');
+  if (!panel) return;
+
+  if (gameState.current !== GAME_STATES.SESSION_END) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    return;
+  }
+
+  panel.hidden = false;
+  panel.innerHTML = '';
+
+  const heading = document.createElement('h2');
+  heading.className = 'panel__title';
+  heading.textContent = 'Final Ranking';
+  panel.appendChild(heading);
+
+  if (gameState.finalRanking.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'leaderboard__empty';
+    empty.textContent = 'No scores recorded this session.';
+    panel.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('ol');
+  list.className = 'leaderboard__list';
+  gameState.finalRanking.forEach((entry, index) => {
+    const item = document.createElement('li');
+    const prefix = index === 0 ? '\u{1F3C6} ' : '';
+    item.textContent = `${prefix}${entry.studentId} — ${entry.score} pts`;
     list.appendChild(item);
   });
   panel.appendChild(list);
@@ -708,17 +772,69 @@ function computeLeaderboard() {
     .sort((a, b) => a.speedMs - b.speedMs);
 }
 
+/**
+ * Cumulative scoring rule: awards points for the round that just ended,
+ * ranked by speed among CORRECT submissions only (leaderboard is already
+ * sorted fastest-first by computeLeaderboard()). With N correct submissions
+ * this round, the fastest gets N points, the 2nd fastest gets N-1, ...,
+ * down to 1 point for the last correct submission. Incorrect or
+ * non-submissions get 0 points that round. Points accumulate into
+ * gameState.totalScores across the whole session (reset only by
+ * resetGame()).
+ * @param {Array<{studentId: string}>} leaderboard - this round's ranked,
+ *   correct-only leaderboard (see computeLeaderboard())
+ */
+function awardRoundPoints(leaderboard) {
+  leaderboard.forEach((entry, index) => {
+    const points = leaderboard.length - index;
+    gameState.totalScores[entry.studentId] = (gameState.totalScores[entry.studentId] || 0) + points;
+  });
+}
+
+/**
+ * Ends the session: stops any pending simulator timers, transitions to
+ * SESSION_END, computes the final ranking from the cumulative totalScores,
+ * broadcasts it to every connected student, and renders it on the host
+ * board. Usable any time except LOBBY (nothing to end yet) — see
+ * renderDashboard()'s btnEndSession wiring.
+ *
+ * Judgment call: students with a total score of 0 (never answered
+ * correctly) ARE included in the final ranking, at the bottom — a teacher
+ * running this with ~40 students likely wants to see who never scored, not
+ * just a shortened winners list.
+ */
+function endSession() {
+  if (gameState.current === GAME_STATES.LOBBY) return;
+
+  clearPendingSimulatorTimers();
+
+  // Built from the full roster (not just Object.entries(totalScores)) so
+  // students who never scored a correct answer — never getting a key in
+  // totalScores at all — still show up at 0 points instead of silently
+  // disappearing from the final ranking.
+  const finalRanking = gameState.students
+    .map((student) => ({ studentId: student.id, score: gameState.totalScores[student.id] || 0 }))
+    .sort((a, b) => b.score - a.score);
+  gameState.finalRanking = finalRanking;
+
+  setGameState(GAME_STATES.SESSION_END);
+
+  broadcastToStudents({ type: MSG_TYPES.SESSION_END, payload: { finalRanking } });
+}
+
 function initDashboardControls() {
   const btnStart = document.getElementById('btn-start-game');
   const btnNext = document.getElementById('btn-next-question');
   const btnReset = document.getElementById('btn-reset-game');
   const btnSimulator = document.getElementById('btn-toggle-simulator');
+  const btnEndSession = document.getElementById('btn-end-session');
   const selectCorrectAnswer = document.getElementById('input-correct-answer');
 
   if (btnStart) btnStart.addEventListener('click', startGame);
   if (btnNext) btnNext.addEventListener('click', nextQuestion);
   if (btnReset) btnReset.addEventListener('click', resetGame);
   if (btnSimulator) btnSimulator.addEventListener('click', toggleSimulator);
+  if (btnEndSession) btnEndSession.addEventListener('click', endSession);
   if (selectCorrectAnswer) {
     selectCorrectAnswer.addEventListener('change', () => {
       gameState.correctAnswer = selectCorrectAnswer.value || null;
@@ -748,6 +864,7 @@ const MSG_TYPES = {
   SUBMIT: 'SUBMIT',
   START_QUESTION: 'START_QUESTION',
   ROUND_END: 'ROUND_END',
+  SESSION_END: 'SESSION_END',
 };
 
 const HOST_ID_RETRY_LIMIT = 5;
@@ -1128,9 +1245,50 @@ function handleClientMessage(message) {
       setControllerQuestionText('Round ended! Check the board for results.');
       break;
     }
+    case MSG_TYPES.SESSION_END: {
+      setControllerOptionsEnabled(false);
+      const finalRanking = (message.payload && message.payload.finalRanking) || [];
+      setControllerQuestionText(buildFinalResultsText(finalRanking));
+      break;
+    }
     default:
       break;
   }
+}
+
+/**
+ * Builds the simple text summary shown on the student/controller view once
+ * the host ends the session — reuses the existing status-text pattern
+ * (setControllerQuestionText) rather than a dedicated results UI. Shows the
+ * student's own score/rank when found in finalRanking, plus a top-3 list;
+ * falls back to a plain "session ended" message if this device never scored
+ * (not present in finalRanking) or the ranking is empty.
+ * @param {Array<{studentId: string, score: number}>} finalRanking - already
+ *   sorted descending by score (see endSession())
+ * @returns {string}
+ */
+function buildFinalResultsText(finalRanking) {
+  if (finalRanking.length === 0) {
+    return 'Sesion terminada! No hubo puntajes registrados.';
+  }
+
+  const winner = finalRanking[0];
+  const myIndex = finalRanking.findIndex((entry) => entry.studentId === gameState.studentId);
+
+  let ownResultText;
+  if (myIndex === -1) {
+    ownResultText = 'No sumaste puntos esta sesion.';
+  } else {
+    const place = myIndex + 1;
+    ownResultText = `Tu puntaje: ${finalRanking[myIndex].score} (${place}° lugar)`;
+  }
+
+  const top3 = finalRanking
+    .slice(0, 3)
+    .map((entry, index) => `${index + 1}. ${entry.studentId} (${entry.score})`)
+    .join(' | ');
+
+  return `Sesion terminada! Ganador: ${winner.studentId} con ${winner.score} pts. ${ownResultText} Top 3: ${top3}`;
 }
 
 function setControllerQuestionText(text) {

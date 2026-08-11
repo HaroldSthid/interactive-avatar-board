@@ -290,6 +290,16 @@ button {
   box-shadow: 0 0 8px rgba(247, 255, 0, 0.6), 0 0 20px rgba(247, 255, 0, 0.25);
 }
 
+/* SESSION_END: same gold family as LEADERBOARD, but with a warmer/brighter
+   glow so it reads as visually distinct — "the whole session is done", not
+   just one round. */
+.badge--state[data-state='SESSION_END'] {
+  border-color: var(--color-neon-yellow);
+  color: var(--color-neon-yellow);
+  box-shadow: 0 0 10px rgba(255, 200, 0, 0.8), 0 0 28px rgba(255, 200, 0, 0.4);
+  animation: pulse-glow-gold 2s ease-in-out infinite;
+}
+
 .roster-tag {
   border-color: var(--color-border);
   color: var(--color-text-muted);
@@ -437,6 +447,20 @@ button {
   display: none;
 }
 
+/* Final session ranking (SESSION_END): same panel/list styling family as
+   the round leaderboard above (reuses .leaderboard__list, including its
+   winner-highlight rule), with a gold border instead of the round panel's
+   cyan pulse to visually distinguish "session over" from "round over". */
+.board-final-ranking {
+  border-color: rgba(255, 200, 0, 0.8);
+  animation: none;
+}
+
+.board-final-ranking .panel__title {
+  color: var(--color-neon-yellow);
+  margin-bottom: var(--spacing-sm);
+}
+
 .leaderboard__list {
   margin: 0;
   padding-left: 1.4em;
@@ -556,6 +580,39 @@ button {
 .board-track[data-state='LEADERBOARD'] .quadrant {
   border-color: var(--color-neon-yellow);
   box-shadow: 0 0 6px rgba(247, 255, 0, 0.3);
+}
+
+/* SESSION_END: a full-board gold glow (rather than the per-quadrant
+   LEADERBOARD treatment above) — the race is over, so the whole track gets
+   a single unified "trophy" glow instead of drawing attention to any one
+   quadrant. */
+.board-track[data-state='SESSION_END'] {
+  animation: pulse-glow-gold-track 2.4s ease-in-out infinite;
+  border-radius: var(--radius-lg);
+}
+
+.board-track[data-state='SESSION_END'] .quadrant {
+  border-color: rgba(255, 200, 0, 0.5);
+}
+
+@keyframes pulse-glow-gold {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(255, 200, 0, 0.8), 0 0 28px rgba(255, 200, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 4px rgba(255, 200, 0, 0.5), 0 0 12px rgba(255, 200, 0, 0.2);
+  }
+}
+
+@keyframes pulse-glow-gold-track {
+  0%,
+  100% {
+    box-shadow: 0 0 16px rgba(255, 200, 0, 0.35), inset 0 0 24px rgba(255, 200, 0, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 4px rgba(255, 200, 0, 0.15), inset 0 0 8px rgba(255, 200, 0, 0.03);
+  }
 }
 
 .quadrant:hover {
