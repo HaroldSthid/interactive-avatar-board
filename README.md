@@ -20,28 +20,53 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 2. Andá a **"Join a Board"**.
 3. Pegá el **Room ID** que te pasó el docente.
 4. Poné tu nombre o ID de estudiante.
-5. Elegí un avatar de la lista **o** subí tu propia foto en JPG (opcional, hasta ~300KB).
+5. Elegí un avatar de la lista **o** subí tu propia foto en JPG (opcional). Cualquier foto real sacada con el celular sirve — se achica y comprime automáticamente en el navegador antes de enviarse, así que no hay que preocuparse por el tamaño del archivo original.
 6. Click en **"Join Board"**.
 7. Esperá a que el docente arranque la pregunta.
 8. Tocá A, B, C o D antes que el resto — la velocidad de respuesta define el ranking.
 
 ## Cómo editar el banco de preguntas
 
-Las preguntas viven en `questions.js`, en un array llamado `QUESTIONS`. El docente puede editarlo a mano para adaptarlo a su clase, sin tocar `app.js`. Cada pregunta tiene esta forma:
+Las preguntas están divididas en **dos archivos** que hay que editar juntos:
 
-```js
-{
-  id: 1,
-  text: "¿Cuál es la capital de Francia?",
-  options: { A: "Madrid", B: "París", C: "Roma", D: "Berlín" },
-  correctAnswer: "B",
-}
-```
+- **`questions-public.js`** — array `QUESTIONS_PUBLIC`, con el `id`, el `text` (enunciado) y las `options` (A/B/C/D) de cada pregunta. Este archivo se carga en el navegador de **todos** — docente y estudiantes — apenas se abre la app.
+- **`answers.json`** — objeto plano que mapea cada `id` de pregunta a su respuesta correcta, por ejemplo `{"1": "B", "2": "C", ...}`. Este archivo **no** se carga automáticamente para nadie: solo se pide (`fetch`) desde el navegador del docente, y recién en el momento en que hace click en "Start Hosting".
 
-El juego recorre el array en orden (y vuelve al principio si se acaban) cada vez que arranca una nueva ronda. También se puede sobrescribir manualmente la "Correct Answer" desde el panel del docente después de arrancar la pregunta, si hace falta.
+### ¿Por qué está separado?
+
+Antes, `questions.js` tenía todo junto (pregunta + respuesta correcta) y se cargaba en el navegador de cada estudiante apenas abría la app — cualquiera que abriera la consola del navegador podía ver todas las respuestas correctas de antemano. Separando la respuesta correcta en `answers.json`, y pidiéndola solo desde el código del docente, evitamos esa exposición casual/automática por defecto.
+
+**Ojo:** esto es una mitigación, no seguridad real. Como es un sitio 100% estático sin backend, no hay forma de ocultarle un archivo a alguien que sepa pedirlo directamente por URL (por ejemplo, un estudiante técnicamente decidido podría igual entrar a `.../answers.json` a mano, o ver el archivo si tiene acceso al dispositivo que hostea). Si el docente necesita una garantía real de que las respuestas no se puedan ver, hace falta un backend — eso queda fuera del alcance de este proyecto.
+
+### Cómo agregar o cambiar una pregunta
+
+Hay que editar **los dos archivos**, usando el **mismo `id`** en ambos:
+
+1. En `questions-public.js`, agregá o editá el item dentro de `QUESTIONS_PUBLIC`:
+
+   ```js
+   {
+     id: 9,
+     text: "¿Cuál es la capital de Francia?",
+     options: { A: "Madrid", B: "París", C: "Roma", D: "Berlín" },
+   }
+   ```
+
+2. En `answers.json`, agregá o editá la entrada correspondiente **con el mismo `id`** (como string, porque es una clave JSON):
+
+   ```json
+   {
+     "9": "B"
+   }
+   ```
+
+3. Si el `id` no coincide entre los dos archivos, esa pregunta no va a tener respuesta correcta cargada automáticamente (el dropdown "Correct Answer" del panel del docente queda vacío para esa ronda, pero se puede elegir a mano igual).
+
+El juego recorre `QUESTIONS_PUBLIC` en orden (y vuelve al principio si se acaban) cada vez que arranca una nueva ronda, sin tocar `app.js`.
 
 ## Limitaciones conocidas
 
 - Depende del servidor de señalización público de PeerJS (puede fallar o tener latencia si ese servicio tiene problemas).
 - Si un estudiante real se une **después** de activar el simulador, el simulador no genera estudiantes mock nuevos (no se mezclan automáticamente).
 - No hay manejo robusto de desconexión: si un estudiante pierde la conexión, su avatar no se limpia ni se marca automáticamente.
+- La separación entre `questions-public.js` y `answers.json` es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.

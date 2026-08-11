@@ -108,8 +108,16 @@ function initViewToggles() {
           return;
         }
         setAvatarUploadStatus('');
-        readAvatarUploadAsDataUrl(uploadedFile)
-          .then((avatarImage) => {
+        resizeAvatarImageToDataUrl(uploadedFile)
+          .then((resizedDataUrl) => {
+            // Sanity check: the resize step should always produce a small
+            // payload, but if it somehow doesn't, fall back to the preset
+            // avatar rather than blocking the join.
+            let avatarImage = resizedDataUrl;
+            if (estimateDataUrlBytes(resizedDataUrl) > AVATAR_RESULT_MAX_BYTES) {
+              avatarImage = undefined;
+              setAvatarUploadStatus('No se pudo achicar la foto lo suficiente, se usa el avatar por defecto.');
+            }
             setControllerStatus(`Student: ${studentId} (connecting...)`);
             navigateTo('controller');
             joinRoom(roomId, studentId, avatar, avatarImage);
@@ -170,7 +178,7 @@ const gameState = {
   students: [], // { id, name, avatar, avatarImage, isMock }
   questionStartedAt: null,
   questionId: 0,
-  questionIndex: 0, // index into QUESTIONS (questions.js), advances each new round
+  questionIndex: 0, // index into QUESTIONS_PUBLIC (questions-public.js), advances each new round
   correctAnswer: null, // host-designated correct quadrant for the active question
   submissions: [], // { studentId, choice, timestamp }
   lastLeaderboard: [], // [{ studentId, speedMs }], ranked ascending, correct answers only
@@ -180,6 +188,10 @@ const gameState = {
   peer: null, // host: this device's PeerJS Peer instance
   roomId: null, // host: the Room ID this peer is listening on
   connections: [], // host: [{ conn, studentId }] for connected students
+  // Correct-answer key ({ [questionId]: 'A'|'B'|'C'|'D' }), fetched lazily
+  // from answers.json ONLY on the host code path (see initHostPeer()), so
+  // students never load it just by opening the app. null until fetched.
+  answerKey: null,
   studentPeer: null, // student: this device's PeerJS Peer instance
   hostConnection: null, // student: DataConnection to the host
   studentId: null, // student: this device's Student ID
@@ -287,17 +299,23 @@ function startNewQuestionRound() {
   resetAvatarPositions();
   setGameState(GAME_STATES.ACTIVE_QUESTION);
 
-  // Pull the next question from the pre-configured bank (questions.js),
-  // wrapping back to the start once exhausted, and pre-fill the host's
-  // "Correct Answer" select from it (still overridable manually afterwards).
-  const bank = typeof QUESTIONS !== 'undefined' && QUESTIONS.length > 0 ? QUESTIONS : null;
+  // Pull the next question from the pre-configured public bank
+  // (questions-public.js), wrapping back to the start once exhausted, and
+  // pre-fill the host's "Correct Answer" select by looking up the answer key
+  // (answers.json, fetched lazily in initHostPeer()) — still overridable
+  // manually afterwards.
+  const bank = typeof QUESTIONS_PUBLIC !== 'undefined' && QUESTIONS_PUBLIC.length > 0 ? QUESTIONS_PUBLIC : null;
   const question = bank ? bank[gameState.questionIndex % bank.length] : null;
 
   if (question) {
-    gameState.correctAnswer = question.correctAnswer;
+    const correctAnswer = gameState.answerKey ? gameState.answerKey[question.id] : undefined;
+    if (!gameState.answerKey) {
+      console.warn('Answer key not loaded yet — Correct Answer will not auto-populate this round.');
+    }
+    gameState.correctAnswer = correctAnswer || null;
     const selectCorrectAnswer = document.getElementById('input-correct-answer');
     if (selectCorrectAnswer) {
-      selectCorrectAnswer.value = question.correctAnswer || '';
+      selectCorrectAnswer.value = correctAnswer || '';
     }
     gameState.questionIndex += 1;
   }
@@ -697,7 +715,14 @@ function setControllerStatus(text) {
 // Optional JPG avatar upload (student join form)
 // ---------------------------------------------------------------------------
 
-const AVATAR_UPLOAD_MAX_BYTES = 300 * 1024; // ~300KB, kept small for a P2P demo
+// Real phone-camera JPGs are typically 1-8MB, so we no longer gate on the
+// original file's byte size (that used to reject almost every real photo).
+// Instead we resize/compress client-side via <canvas> to a small fixed
+// thumbnail — the RESULT is what has to be small, not the upload.
+const AVATAR_UPLOAD_MAX_SOURCE_BYTES = 15 * 1024 * 1024; // ~15MB: only reject truly absurd files, to avoid hanging the browser on decode
+const AVATAR_THUMBNAIL_SIZE = 160; // px, square, cover-cropped
+const AVATAR_JPEG_QUALITY = 0.7;
+const AVATAR_RESULT_MAX_BYTES = 80 * 1024; // ~80KB sanity check on the resized data URL
 
 function setAvatarUploadStatus(text) {
   const el = document.getElementById('avatar-upload-status');
@@ -706,7 +731,8 @@ function setAvatarUploadStatus(text) {
 
 /**
  * Client-side validation for the optional avatar photo upload: must be a
- * JPEG and no larger than AVATAR_UPLOAD_MAX_BYTES.
+ * JPEG, and not an absurdly large source file (the resize step below is
+ * what guarantees the final payload is small, not this check).
  * @param {File} file
  * @returns {string|null} an error message, or null if the file is valid
  */
@@ -714,24 +740,69 @@ function validateAvatarUploadFile(file) {
   if (file.type !== 'image/jpeg') {
     return 'La foto debe ser un archivo JPG.';
   }
-  if (file.size > AVATAR_UPLOAD_MAX_BYTES) {
-    return 'La foto es muy pesada (máx. ~300KB).';
+  if (file.size > AVATAR_UPLOAD_MAX_SOURCE_BYTES) {
+    return 'La foto es demasiado pesada. Probá con otra.';
   }
   return null;
 }
 
 /**
- * Reads a File as a base64 data URL, for embedding directly in the JOIN
- * message payload sent over the PeerJS data channel.
- * @param {File} file
- * @returns {Promise<string>}
+ * Estimates the decoded byte size of a base64 data URL (used for the
+ * post-resize sanity check).
+ * @param {string} dataUrl
+ * @returns {number}
  */
-function readAvatarUploadAsDataUrl(file) {
+function estimateDataUrlBytes(dataUrl) {
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  return Math.ceil((base64.length * 3) / 4);
+}
+
+/**
+ * Resizes/compresses an uploaded JPG File into a small, fixed-size,
+ * cover-cropped square thumbnail suitable as an avatar, via an off-screen
+ * <canvas>. This guarantees a small payload regardless of the original
+ * file's dimensions/size (real phone photos are often several MB).
+ * @param {File} file
+ * @returns {Promise<string>} a small base64 JPEG data URL
+ */
+function resizeAvatarImageToDataUrl(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        const size = AVATAR_THUMBNAIL_SIZE;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Cover-crop: scale so the shorter side fills the square, then
+        // center-crop the overflow on the longer side.
+        const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight);
+        const drawWidth = img.naturalWidth * scale;
+        const drawHeight = img.naturalHeight * scale;
+        const offsetX = (size - drawWidth) / 2;
+        const offsetY = (size - drawHeight) / 2;
+
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', AVATAR_JPEG_QUALITY);
+        resolve(dataUrl);
+      } catch (err) {
+        reject(err);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Image failed to load'));
+    };
+
+    img.src = objectUrl;
   });
 }
 
@@ -745,6 +816,20 @@ function initHostPeer(attempt = 0) {
   if (typeof Peer === 'undefined') {
     setHostStatus('PeerJS unavailable');
     return;
+  }
+
+  // Lazily fetch the correct-answer key — ONLY on the host code path, ONLY
+  // when hosting actually starts, and only once per session (not on every
+  // question). Students never trigger this fetch just by opening the app.
+  if (!gameState.answerKey) {
+    fetch('answers.json')
+      .then((response) => response.json())
+      .then((data) => {
+        gameState.answerKey = data;
+      })
+      .catch((err) => {
+        console.error('Failed to load answers.json:', err);
+      });
   }
 
   const roomId = generateRoomId();
