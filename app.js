@@ -694,6 +694,47 @@ const MSG_TYPES = {
 const HOST_ID_RETRY_LIMIT = 5;
 
 /**
+ * WebRTC ICE server config passed to every `Peer` (host and student).
+ *
+ * PeerJS's cloud broker only handles the initial signaling handshake — the
+ * actual data connection is direct peer-to-peer and needs to traverse each
+ * device's NAT. A STUN server alone (the PeerJS default) is enough when both
+ * devices are on permissive networks, but fails ("connection failed" on the
+ * student side) whenever the host and student are on different
+ * networks/carriers, or on a Wi-Fi with client/AP isolation enabled (common
+ * on school and office networks) — very likely scenarios for a classroom
+ * with 40 students on their own phones. Adding a TURN server lets the
+ * connection relay through a server instead of requiring a direct path.
+ *
+ * These are the Open Relay Project's public, free TURN credentials
+ * (metered.ca) — rate-limited but fine for classroom-scale use. If it proves
+ * unreliable at full scale, swap in a paid TURN provider (Twilio, Xirsys,
+ * or metered.ca's own paid tier) here.
+ */
+const PEER_OPTIONS = {
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.relay.metered.ca:80' },
+      {
+        urls: 'turn:global.relay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:global.relay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:global.relay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+    ],
+  },
+};
+
+/**
  * Generates a short, human-shareable Room ID suitable as a PeerJS peer ID.
  */
 function generateRoomId() {
@@ -833,7 +874,7 @@ function initHostPeer(attempt = 0) {
   }
 
   const roomId = generateRoomId();
-  const peer = new Peer(roomId);
+  const peer = new Peer(roomId, PEER_OPTIONS);
 
   peer.on('open', (id) => {
     gameState.peer = peer;
@@ -977,7 +1018,7 @@ function joinRoom(roomId, studentId, avatar, avatarImage) {
   }
 
   gameState.studentId = studentId;
-  const peer = new Peer();
+  const peer = new Peer(PEER_OPTIONS);
   gameState.studentPeer = peer;
 
   peer.on('open', () => {
