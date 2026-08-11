@@ -10,8 +10,8 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 2. Click en **"Start Hosting"**.
 3. Compartí el **Room ID** que se genera (decilo en voz alta o proyectalo) para que los estudiantes lo usen al unirse.
 4. Opcional: click en **"Simulator: On"** para armar una demo/prueba rápida con estudiantes simulados, sin necesitar conexiones reales.
-5. Click en **"Start Game"** para arrancar la primera pregunta del banco.
-6. Click en **"Next Question"** para avanzar a la siguiente pregunta.
+5. Click en **"Start Game"** para arrancar la primera pregunta del banco. Cada pregunta tiene un **cronómetro de 20 segundos** (barra que se va vaciando, con tick-tock y alarma) — si llega a 0, la ronda termina sola, con el mismo efecto que clickear "Next Question" a mano.
+6. Click en **"Next Question"** para avanzar a la siguiente pregunta (también corta el cronómetro si todavía estaba corriendo).
 7. Click en **"Finalizar sesión"** en cualquier momento (excepto en LOBBY) para cerrar la sesión y mostrar el ranking final acumulado, tanto en el board como en el celular de cada estudiante.
 8. Click en **"Reset"** para reiniciar toda la sesión (vuelve al banco de preguntas desde el principio y borra el puntaje acumulado), incluso después de "Finalizar sesión".
 

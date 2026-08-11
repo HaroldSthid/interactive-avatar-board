@@ -209,20 +209,22 @@ button {
 
 .field--avatar-picker {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--spacing-sm);
 }
 
 .field--avatar-picker .field__input {
-  flex: 1;
+  width: 100%;
 }
 
 .avatar-preview {
-  width: 44px;
-  height: 44px;
+  width: 140px;
+  height: 140px;
   flex-shrink: 0;
   border-radius: 50%;
-  border: 2px solid var(--color-neon-magenta);
+  border: 3px solid var(--color-neon-magenta);
+  box-shadow: var(--shadow-neon-magenta);
   object-fit: cover;
   background: var(--color-bg-panel-alt);
 }
@@ -328,6 +330,64 @@ button {
 .roster-tag[data-submitted='true'] {
   border-color: var(--color-neon-green);
   color: var(--color-neon-green);
+}
+
+/* ==========================================================================
+   Countdown timer bar (host board + student controller)
+   ========================================================================== */
+
+.timer-bar {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.timer-bar[hidden] {
+  display: none;
+}
+
+/* Width is set once per round by app.js's startCountdown() (100% -> 0% with
+   a `transition: width <ms>ms linear` applied right before), NOT animated
+   per-frame here — this is just the resting/base styling. */
+.timer-bar__fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--color-neon-cyan), var(--color-neon-yellow));
+  transition: background-color 0.3s ease;
+}
+
+/* Last ~5 seconds: swapped in by app.js via classList.toggle(), reads as
+   more urgent (yellow-to-red gradient + a faster pulse) than the calmer
+   cyan/yellow "healthy" state above. */
+.timer-bar__fill--urgent {
+  background: linear-gradient(90deg, var(--color-neon-yellow), var(--color-neon-red));
+  animation: pulse-glow-timer-urgent 0.6s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-timer-urgent {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(255, 56, 96, 0.6), 0 0 14px rgba(255, 56, 96, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 2px rgba(255, 56, 96, 0.3);
+  }
+}
+
+.timer-bar__count {
+  position: absolute;
+  top: 50%;
+  right: var(--spacing-sm);
+  transform: translateY(-50%);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: var(--color-text);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
 }
 
 .board-track {

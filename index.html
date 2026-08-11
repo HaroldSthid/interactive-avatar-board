@@ -47,13 +47,13 @@
           <label class="field">
             <span class="field__label">Avatar</span>
             <div class="field--avatar-picker">
+              <img id="avatar-preview" src="avatars/hero-knight.jpg" alt="" class="avatar-preview" />
               <select id="input-avatar" class="field__input">
                 <option value="hero-knight">Hero Knight</option>
                 <option value="shadow-ninja">Shadow Ninja</option>
                 <option value="cyber-mage">Cyber Mage</option>
                 <option value="star-ranger">Star Ranger</option>
               </select>
-              <img id="avatar-preview" src="avatars/hero-knight.jpg" alt="" class="avatar-preview" />
             </div>
           </label>
           <label class="field">
@@ -93,6 +93,11 @@
         <button id="btn-next-question" type="button" class="btn btn--secondary" disabled>Next Question</button>
         <button id="btn-end-session" type="button" class="btn btn--ghost" disabled>Finalizar sesión</button>
         <button id="btn-reset-game" type="button" class="btn btn--ghost">Reset</button>
+      </div>
+
+      <div id="board-timer" class="timer-bar" hidden>
+        <div id="board-timer-fill" class="timer-bar__fill"></div>
+        <span id="board-timer-count" class="timer-bar__count"></span>
       </div>
 
       <div id="board-track" class="board-track">
@@ -137,6 +142,10 @@
 
       <div id="controller-question" class="controller-question">
         <p id="controller-question-text" class="controller-question__text">Waiting for the host to start a question&hellip;</p>
+        <div id="controller-timer" class="timer-bar" hidden>
+          <div id="controller-timer-fill" class="timer-bar__fill"></div>
+          <span id="controller-timer-count" class="timer-bar__count"></span>
+        </div>
       </div>
 
       <div id="controller-grid" class="controller-grid">

@@ -231,6 +231,10 @@ const gameState = {
   controllerQuestionStartedAt: null, // student: local clock ref for elapsed time
   controllerCurrentQuestionId: null, // student: questionId of the active question
   controllerHasSubmitted: false, // student: guards against double submission
+
+  // --- Per-question countdown (timer bar + tick/alarm audio) ---
+  hostCountdownStop: null, // host: stop() returned by startCountdown() for the board's timer
+  controllerCountdownStop: null, // student: stop() returned by startCountdown() for the controller's timer
 };
 
 /**
@@ -312,6 +316,173 @@ function recordSubmission(studentId, choice, timestamp = Date.now()) {
   if (gameState.submissions.some((sub) => sub.studentId === studentId)) return;
   gameState.submissions.push({ studentId, choice, timestamp });
   renderRoster();
+}
+
+// ---------------------------------------------------------------------------
+// Countdown Audio (Web Audio API) — synthesized tick-tock + alarm, no
+// external audio files (keeps the app dependency-free and avoids any
+// licensing concerns). The AudioContext is created lazily, on first actual
+// playback, rather than at module load — browsers block AudioContext
+// creation without a prior user gesture, and the first playback always
+// happens after the user has already clicked "Start Hosting" or "Join
+// Board", so there's no autoplay-policy issue in practice.
+// ---------------------------------------------------------------------------
+
+let sharedAudioContext = null;
+
+/**
+ * Lazily creates (or resumes, if suspended) the single shared AudioContext
+ * used for all tick/alarm playback.
+ * @returns {AudioContext|null} null if the Web Audio API is unavailable
+ */
+function getAudioContext() {
+  if (!sharedAudioContext) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    sharedAudioContext = new AudioContextClass();
+  }
+  if (sharedAudioContext.state === 'suspended') {
+    sharedAudioContext.resume().catch(() => {});
+  }
+  return sharedAudioContext;
+}
+
+/**
+ * Plays a short, click-free beep: a plain oscillator with an exponential
+ * gain ramp-down (avoids the audible "pop" a hard stop would cause).
+ * @param {number} freq - frequency in Hz
+ * @param {number} durationSec
+ * @param {number} [volume] - peak gain, 0-1
+ */
+function playTick(freq, durationSec, volume = 0.15) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = 'square';
+  oscillator.frequency.value = freq;
+
+  const now = ctx.currentTime;
+  gain.gain.setValueAtTime(volume, now);
+  // exponentialRampToValueAtTime can't ramp to exactly 0, hence 0.0001.
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec);
+
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+
+  oscillator.start(now);
+  oscillator.stop(now + durationSec);
+}
+
+/**
+ * Two-tone "buzzer" alarm (two quick low-pitched tones in sequence), played
+ * once when a countdown hits 0.
+ */
+function playAlarm() {
+  playTick(220, 0.22, 0.2);
+  window.setTimeout(() => playTick(160, 0.25, 0.2), 200);
+}
+
+// ---------------------------------------------------------------------------
+// Countdown Controller — per-question timer with a depleting progress bar
+// and tick/alarm audio. Shared by the host board and the student controller:
+// each device runs its own local countdown, deriving the deadline from the
+// `startedAt` timestamp already broadcast in START_QUESTION, so there's no
+// need for a separate networked "tick" message.
+// ---------------------------------------------------------------------------
+
+// How often the label/audio-trigger interval re-checks the remaining time.
+// The bar's own animation is a single CSS transition set once per round (see
+// startCountdown below), NOT driven by this interval — this is only for the
+// numeric seconds label and for triggering tick sounds at the right moments.
+const COUNTDOWN_TICK_INTERVAL_MS = 200;
+// Last stretch of the countdown: ticks speed up (500ms boundaries instead of
+// 1s) and rise in pitch for tension.
+const COUNTDOWN_URGENT_THRESHOLD_MS = 5000;
+
+/**
+ * Starts a local countdown against `startedAt + durationMs`.
+ * @param {object} opts
+ * @param {HTMLElement} [opts.barFill] - the depleting fill element
+ * @param {HTMLElement} [opts.countLabel] - element showing seconds remaining
+ * @param {HTMLElement} [opts.container] - the timer bar wrapper (toggled via `hidden`)
+ * @param {number} opts.startedAt - epoch ms the round started (this device's clock ref)
+ * @param {number} opts.durationMs - total countdown duration
+ * @param {() => void} opts.onExpire - called once, when the countdown reaches 0
+ * @returns {() => void} stop() — cancels the countdown WITHOUT calling onExpire
+ *   or playing the alarm; used for manual round-end / reset, so a still-running
+ *   countdown never double-fires.
+ */
+function startCountdown({ barFill, countLabel, container, startedAt, durationMs, onExpire }) {
+  const deadline = startedAt + durationMs;
+  let expired = false;
+  // Seconds bucket already ticked (1s boundaries normally, 500ms boundaries
+  // in the last COUNTDOWN_URGENT_THRESHOLD_MS) — compared each interval tick
+  // to avoid firing the same tick sound twice.
+  let lastTickBucket = null;
+
+  if (container) container.hidden = false;
+
+  if (barFill) {
+    barFill.classList.remove('timer-bar__fill--urgent');
+    // Instantly full, no transition...
+    barFill.style.transition = 'none';
+    barFill.style.width = '100%';
+    // ...force a reflow so the browser registers that instant state...
+    void barFill.offsetWidth;
+    // ...then animate to empty over exactly however much time is actually
+    // left (accounts for any delay — e.g. network latency — between
+    // `startedAt` and this function actually running on the student side).
+    const remainingAtStart = Math.max(0, deadline - Date.now());
+    barFill.style.transition = `width ${remainingAtStart}ms linear`;
+    barFill.style.width = '0%';
+  }
+
+  function stopInternal(hide) {
+    window.clearInterval(intervalId);
+    if (barFill) {
+      barFill.style.transition = 'none';
+      barFill.classList.remove('timer-bar__fill--urgent');
+      if (hide) barFill.style.width = '0%';
+    }
+    if (container && hide) container.hidden = true;
+  }
+
+  const intervalId = window.setInterval(() => {
+    if (expired) return;
+
+    const remaining = Math.max(0, deadline - Date.now());
+    const secondsRemaining = Math.ceil(remaining / 1000);
+    if (countLabel) countLabel.textContent = String(secondsRemaining);
+
+    const urgent = remaining > 0 && remaining <= COUNTDOWN_URGENT_THRESHOLD_MS;
+    if (barFill) barFill.classList.toggle('timer-bar__fill--urgent', urgent);
+
+    const tickBucket = urgent ? Math.ceil(remaining / 500) : Math.ceil(remaining / 1000);
+    if (remaining > 0 && tickBucket !== lastTickBucket) {
+      lastTickBucket = tickBucket;
+      // Calmer/lower tick most of the countdown, faster/higher-pitched tick
+      // for the last few seconds' tension ramp.
+      if (urgent) {
+        playTick(880, 0.08, 0.12);
+      } else {
+        playTick(523, 0.09, 0.1);
+      }
+    }
+
+    if (remaining <= 0) {
+      expired = true;
+      stopInternal(true);
+      playAlarm();
+      onExpire();
+    }
+  }, COUNTDOWN_TICK_INTERVAL_MS);
+
+  return function stop() {
+    if (expired) return;
+    stopInternal(true);
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -397,10 +568,26 @@ function startNewQuestionRound() {
       text: question ? question.text : 'New question! Choose your answer.',
       options: question ? question.options : QUADRANTS,
       startedAt: gameState.questionStartedAt,
+      durationMs: QUESTION_DURATION_MS,
     },
   });
 
   renderRoster();
+
+  gameState.hostCountdownStop?.();
+  gameState.hostCountdownStop = startCountdown({
+    barFill: document.getElementById('board-timer-fill'),
+    countLabel: document.getElementById('board-timer-count'),
+    container: document.getElementById('board-timer'),
+    startedAt: gameState.questionStartedAt,
+    durationMs: QUESTION_DURATION_MS,
+    onExpire: () => {
+      // If the host already ended the round manually (or reset/ended the
+      // session) before the clock ran out, gameState.current has already
+      // moved on — don't double-fire nextQuestion()'s round-end logic.
+      if (gameState.current === GAME_STATES.ACTIVE_QUESTION) nextQuestion();
+    },
+  });
 }
 
 function startGame() {
@@ -415,6 +602,12 @@ function startGame() {
 
 function nextQuestion() {
   if (gameState.current === GAME_STATES.ACTIVE_QUESTION) {
+    // Cancel the pending auto-end countdown BEFORE doing the round-end work,
+    // so a manual "End Question" click never leaves a stray timer running
+    // that could later fire its own onExpire (already guarded by the
+    // gameState.current check there too, but stopping cleanly here also
+    // avoids a stray alarm sound / interval).
+    gameState.hostCountdownStop?.();
     clearPendingSimulatorTimers();
     const leaderboard = computeLeaderboard();
     gameState.lastLeaderboard = leaderboard;
@@ -431,6 +624,7 @@ function nextQuestion() {
 }
 
 function resetGame() {
+  gameState.hostCountdownStop?.();
   clearPendingSimulatorTimers();
   gameState.connections.forEach(({ conn }) => {
     try {
@@ -827,6 +1021,10 @@ function awardRoundPoints(leaderboard) {
 function endSession() {
   if (gameState.current === GAME_STATES.LOBBY) return;
 
+  // "Finalizar sesión" can be clicked mid-round (ACTIVE_QUESTION) — cancel
+  // any pending auto-end countdown so it can't fire nextQuestion() after the
+  // session has already moved to SESSION_END.
+  gameState.hostCountdownStop?.();
   clearPendingSimulatorTimers();
 
   // Built from the full roster (not just Object.entries(totalScores)) so
@@ -889,6 +1087,12 @@ const MSG_TYPES = {
 };
 
 const HOST_ID_RETRY_LIMIT = 5;
+
+// Per-question countdown duration — a single named constant so it's trivial
+// to tweak later. When it hits 0, the round ends automatically (same effect
+// as the host clicking "End Question" — see startNewQuestionRound()'s
+// startCountdown() call and nextQuestion()).
+const QUESTION_DURATION_MS = 20000;
 
 /**
  * WebRTC ICE server config passed to every `Peer` (host and student).
@@ -1259,17 +1463,33 @@ function handleClientMessage(message) {
       setControllerQuestionText((message.payload && message.payload.text) || 'Choose your answer!');
       setControllerOptionLabels(message.payload && message.payload.options);
       setControllerOptionsEnabled(true);
+
+      gameState.controllerCountdownStop?.();
+      gameState.controllerCountdownStop = startCountdown({
+        barFill: document.getElementById('controller-timer-fill'),
+        countLabel: document.getElementById('controller-timer-count'),
+        container: document.getElementById('controller-timer'),
+        startedAt: gameState.controllerQuestionStartedAt,
+        durationMs: (message.payload && message.payload.durationMs) || QUESTION_DURATION_MS,
+        // The student doesn't drive round-end — the host does, via
+        // ROUND_END — so this is purely visual/audio flavor. If the host
+        // ends the round early, ROUND_END's handler below stops this
+        // countdown before it would ever expire on its own.
+        onExpire: () => {},
+      });
       break;
     }
     case MSG_TYPES.ROUND_END: {
       setControllerOptionsEnabled(false);
       setControllerQuestionText('Round ended! Check the board for results.');
+      gameState.controllerCountdownStop?.();
       break;
     }
     case MSG_TYPES.SESSION_END: {
       setControllerOptionsEnabled(false);
       const finalRanking = (message.payload && message.payload.finalRanking) || [];
       setControllerQuestionText(buildFinalResultsText(finalRanking));
+      gameState.controllerCountdownStop?.();
       break;
     }
     default:
