@@ -635,6 +635,23 @@ function moveAvatarToken(studentId, quadrant) {
     token.style.transition = '';
     token.style.transform = '';
   });
+
+  // Independent "submission registered" feedback (box-shadow/outline pulse,
+  // not `transform`, so it never fights the FLIP animation above) — plays
+  // regardless of how far the token actually traveled, so a submission to
+  // a quadrant visually close to the starting line still gives a clear
+  // confirmation that the click was registered.
+  token.classList.remove('avatar-token--submit-pop');
+  // Force reflow so the class can be re-added to replay the animation on a
+  // future submission (irrelevant per-round since tokens reset, but keeps
+  // the helper correct if ever called twice on the same token).
+  void token.offsetWidth;
+  token.classList.add('avatar-token--submit-pop');
+  token.addEventListener(
+    'animationend',
+    () => token.classList.remove('avatar-token--submit-pop'),
+    { once: true }
+  );
 }
 
 /**
