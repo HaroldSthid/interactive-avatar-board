@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Avatar Board</title>
+
+  <!-- Google Fonts: cyberpunk-styled display + readable body font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Setup View: room/host setup, role selection -->
+    <section id="view-setup" class="view" data-view="setup">
+      <header class="view__header">
+        <h1 class="brand">Interactive Avatar Board</h1>
+        <p class="brand__subtitle">Choose how you want to join the session</p>
+      </header>
+
+      <div class="setup__roles">
+        <form id="form-host" class="panel panel--host">
+          <h2 class="panel__title">Host a Board (Teacher)</h2>
+          <label class="field">
+            <span class="field__label">Room ID</span>
+            <input type="text" id="input-host-room" class="field__input" placeholder="Generated on start" readonly />
+          </label>
+          <button type="submit" class="btn btn--primary">Start Hosting</button>
+        </form>
+
+        <form id="form-student" class="panel panel--student">
+          <h2 class="panel__title">Join a Board (Student)</h2>
+          <label class="field">
+            <span class="field__label">Room ID</span>
+            <input type="text" id="input-join-room" class="field__input" placeholder="e.g. ROOM123" required />
+          </label>
+          <label class="field">
+            <span class="field__label">Student ID</span>
+            <input type="text" id="input-student-id" class="field__input" placeholder="Your Student ID" required />
+          </label>
+          <label class="field">
+            <span class="field__label">Avatar</span>
+            <select id="input-avatar" class="field__input">
+              <option value="hero-knight">Hero Knight</option>
+              <option value="shadow-ninja">Shadow Ninja</option>
+              <option value="cyber-mage">Cyber Mage</option>
+              <option value="star-ranger">Star Ranger</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn--secondary">Join Board</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Board View: teacher/host race dashboard -->
+    <section id="view-board" class="view" data-view="board" hidden>
+      <header class="view__header">
+        <h1 class="brand brand--small">Race Board</h1>
+        <div class="board__meta">
+          <span id="board-room-id" class="badge">Room: --</span>
+          <button id="btn-back-to-setup-board" class="btn btn--ghost">Exit</button>
+        </div>
+      </header>
+
+      <div id="board-controls" class="board-controls">
+        <span id="board-state" class="badge badge--state">State: LOBBY</span>
+        <label class="field field--inline">
+          <span class="field__label">Correct Answer</span>
+          <select id="input-correct-answer" class="field__input">
+            <option value="">--</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </label>
+        <button id="btn-toggle-simulator" type="button" class="btn btn--ghost">Simulator: Off</button>
+        <button id="btn-start-game" type="button" class="btn btn--primary">Start Game</button>
+        <button id="btn-next-question" type="button" class="btn btn--secondary" disabled>Next Question</button>
+        <button id="btn-reset-game" type="button" class="btn btn--ghost">Reset</button>
+      </div>
+
+      <div id="board-track" class="board-track">
+        <div id="board-starting-line" class="board-starting-line" aria-label="Waiting area"></div>
+
+        <div id="board-grid" class="board-grid">
+          <div class="quadrant" data-quadrant="A">
+            <span class="quadrant__label">A</span>
+            <div class="quadrant__lane"></div>
+          </div>
+          <div class="quadrant" data-quadrant="B">
+            <span class="quadrant__label">B</span>
+            <div class="quadrant__lane"></div>
+          </div>
+          <div class="quadrant" data-quadrant="C">
+            <span class="quadrant__label">C</span>
+            <div class="quadrant__lane"></div>
+          </div>
+          <div class="quadrant" data-quadrant="D">
+            <span class="quadrant__label">D</span>
+            <div class="quadrant__lane"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="board-leaderboard" class="board-leaderboard" aria-label="Round leaderboard" hidden></div>
+
+      <div id="board-roster" class="board-roster" aria-label="Connected students"></div>
+    </section>
+
+    <!-- Controller View: student answer submission -->
+    <section id="view-controller" class="view" data-view="controller" hidden>
+      <header class="view__header">
+        <h1 class="brand brand--small">Controller</h1>
+        <div class="board__meta">
+          <span id="controller-student-tag" class="badge">Student: --</span>
+          <button id="btn-back-to-setup-controller" class="btn btn--ghost">Exit</button>
+        </div>
+      </header>
+
+      <div id="controller-question" class="controller-question">
+        <p id="controller-question-text" class="controller-question__text">Waiting for the host to start a question&hellip;</p>
+      </div>
+
+      <div id="controller-grid" class="controller-grid">
+        <button type="button" class="controller-option" data-choice="A">A</button>
+        <button type="button" class="controller-option" data-choice="B">B</button>
+        <button type="button" class="controller-option" data-choice="C">C</button>
+        <button type="button" class="controller-option" data-choice="D">D</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- PeerJS CDN (P2P data sync) -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

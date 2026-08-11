@@ -1,0 +1,58 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Vanilla HTML5/CSS/ES6 modules, PeerJS (CDN), no build tooling
+  Architecture: Single-Page App (SPA) with dual views (Teacher/Student), P2P sync via WebRTC
+  Testing: No test framework (strict TDD unavailable)
+  Style: Cyberpunk theme with CSS Grid/Flexbox, custom animations, dynamic neon UI
+
+testing:
+  strict_tdd: false
+  runner: null
+  test_command: ""
+  build_command: ""
+  coverage_command: ""
+  coverage_threshold: 0
+  layers:
+    unit:
+      available: false
+      tool: null
+    integration:
+      available: false
+      tool: null
+    e2e:
+      available: false
+      tool: null
+  quality:
+    linter:
+      available: false
+      command: ""
+    type_checker:
+      available: false
+      command: ""
+    formatter:
+      available: false
+      command: ""
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

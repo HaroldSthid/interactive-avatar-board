@@ -1,0 +1,581 @@
+/* ==========================================================================
+   Interactive Avatar Board — Cyberpunk Theme
+   Phase 1: layout variables, base typography, view wrappers
+   Phase 3: avatar-token transitions (starting line -> quadrant lane),
+            leaderboard panel, inline correct-answer field
+   Phase 4: glow/neon polish, dynamic active-question states,
+            avatar hover tooltips (Student ID + response speed)
+   ========================================================================== */
+
+:root {
+  /* Cyberpunk palette */
+  --color-bg: #0a0a14;
+  --color-bg-panel: #12121f;
+  --color-bg-panel-alt: #191930;
+  --color-border: #2a2a45;
+  --color-neon-cyan: #00f0ff;
+  --color-neon-magenta: #ff00c8;
+  --color-neon-yellow: #f7ff00;
+  --color-neon-green: #39ff88;
+  --color-neon-red: #ff3860;
+  --color-text: #e6e6f0;
+  --color-text-muted: #9090b0;
+
+  /* Typography */
+  --font-display: 'Orbitron', 'Segoe UI', sans-serif;
+  --font-body: 'Rajdhani', 'Segoe UI', sans-serif;
+
+  /* Layout */
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 40px;
+
+  --shadow-neon-cyan: 0 0 8px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.25);
+  --shadow-neon-magenta: 0 0 8px rgba(255, 0, 200, 0.6), 0 0 20px rgba(255, 0, 200, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(0, 240, 255, 0.06), transparent 40%),
+    radial-gradient(circle at 85% 90%, rgba(255, 0, 200, 0.06), transparent 40%),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+  margin: 0;
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   View wrappers (Setup / Board / Controller)
+   ========================================================================== */
+
+.view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.view[hidden] {
+  display: none;
+}
+
+.view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--spacing-md);
+}
+
+.brand {
+  font-size: 2rem;
+  color: var(--color-neon-cyan);
+  text-shadow: var(--shadow-neon-cyan);
+}
+
+.brand--small {
+  font-size: 1.4rem;
+}
+
+.brand__subtitle {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neon-cyan);
+  border-radius: var(--radius-md);
+  color: var(--color-neon-cyan);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+}
+
+/* ==========================================================================
+   Setup view: role selection panels
+   ========================================================================== */
+
+.setup__roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.panel {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.panel--host {
+  border-color: var(--color-neon-cyan);
+}
+
+.panel--student {
+  border-color: var(--color-neon-magenta);
+}
+
+.panel__title {
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.field__label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field__input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 1rem;
+}
+
+.field__input:focus {
+  outline: none;
+  border-color: var(--color-neon-cyan);
+  box-shadow: var(--shadow-neon-cyan);
+}
+
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.field--inline .field__input {
+  padding: 2px var(--spacing-sm);
+  font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn--primary {
+  background: var(--color-neon-cyan);
+  color: var(--color-bg);
+}
+
+.btn--primary:hover {
+  box-shadow: var(--shadow-neon-cyan);
+}
+
+.btn--secondary {
+  background: var(--color-neon-magenta);
+  color: var(--color-bg);
+}
+
+.btn--secondary:hover {
+  box-shadow: var(--shadow-neon-magenta);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.btn--ghost:hover {
+  border-color: var(--color-neon-cyan);
+  color: var(--color-neon-cyan);
+}
+
+/* ==========================================================================
+   Board view: avatar race quadrants
+   ========================================================================== */
+
+.board__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.board-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.badge--state {
+  border-color: var(--color-neon-yellow);
+  color: var(--color-neon-yellow);
+  transition: border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.badge--state[data-state='ACTIVE_QUESTION'] {
+  border-color: var(--color-neon-cyan);
+  color: var(--color-neon-cyan);
+  box-shadow: var(--shadow-neon-cyan);
+  animation: pulse-glow-cyan 1.6s ease-in-out infinite;
+}
+
+.badge--state[data-state='LEADERBOARD'] {
+  border-color: var(--color-neon-yellow);
+  color: var(--color-neon-yellow);
+  box-shadow: 0 0 8px rgba(247, 255, 0, 0.6), 0 0 20px rgba(247, 255, 0, 0.25);
+}
+
+.roster-tag {
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.roster-tag[data-submitted='true'] {
+  border-color: var(--color-neon-green);
+  color: var(--color-neon-green);
+}
+
+.board-track {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.board-starting-line {
+  min-height: 64px;
+  background: var(--color-bg-panel);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.board-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  min-height: 400px;
+}
+
+.quadrant {
+  position: relative;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.quadrant__label {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--color-neon-yellow);
+}
+
+.quadrant__lane {
+  flex: 1;
+  position: relative;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+}
+
+/* Avatar tokens: stay in normal document flow (starting line or a quadrant
+   lane); reparenting is paired with a FLIP transform in app.js so the
+   `transform` transition below animates the perceived movement between
+   the starting line and the chosen quadrant. */
+.avatar-token {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-bg-panel-alt);
+  border: 2px solid var(--color-neon-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  color: var(--color-text);
+  transition: transform 0.6s ease-out, border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.avatar-token[data-submitted='true'] {
+  border-color: var(--color-neon-yellow);
+}
+
+.avatar-token[data-correct='true'] {
+  border-color: var(--color-neon-green);
+  background: rgba(57, 255, 136, 0.15);
+}
+
+.avatar-token[data-correct='false'] {
+  border-color: var(--color-neon-red);
+  background: rgba(255, 56, 96, 0.15);
+}
+
+.board-leaderboard {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-neon-yellow);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.board-leaderboard[hidden] {
+  display: none;
+}
+
+.leaderboard__list {
+  margin: 0;
+  padding-left: 1.4em;
+  color: var(--color-text);
+}
+
+.leaderboard__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.board-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  min-height: 40px;
+}
+
+/* ==========================================================================
+   Controller view: student answer submission
+   ========================================================================== */
+
+.controller-question {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  text-align: center;
+}
+
+.controller-question__text {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+}
+
+.controller-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  min-height: 300px;
+}
+
+.controller-option {
+  background: var(--color-bg-panel-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.controller-option:hover {
+  border-color: var(--color-neon-cyan);
+  box-shadow: var(--shadow-neon-cyan);
+}
+
+.controller-option:active {
+  transform: scale(0.97);
+}
+
+/* ==========================================================================
+   Phase 4: Cyberpunk polish — glow effects, dynamic active states,
+   and avatar hover tooltips
+   ========================================================================== */
+
+@keyframes pulse-glow-cyan {
+  0%,
+  100% {
+    box-shadow: var(--shadow-neon-cyan);
+  }
+  50% {
+    box-shadow: 0 0 4px rgba(0, 240, 255, 0.4), 0 0 10px rgba(0, 240, 255, 0.15);
+  }
+}
+
+@keyframes pulse-border-quadrant {
+  0%,
+  100% {
+    border-color: var(--color-neon-cyan);
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.35), inset 0 0 6px rgba(0, 240, 255, 0.1);
+  }
+  50% {
+    border-color: var(--color-border);
+    box-shadow: none;
+  }
+}
+
+/* Board track reflects the current game state; quadrants glow while a
+   question is active to draw attention to where avatars will land. */
+.board-track[data-state='ACTIVE_QUESTION'] .quadrant {
+  animation: pulse-border-quadrant 2.2s ease-in-out infinite;
+}
+
+.board-track[data-state='ACTIVE_QUESTION'] .quadrant__label {
+  text-shadow: var(--shadow-neon-cyan);
+}
+
+.board-track[data-state='LEADERBOARD'] .quadrant {
+  border-color: var(--color-neon-yellow);
+  box-shadow: 0 0 6px rgba(247, 255, 0, 0.3);
+}
+
+.quadrant:hover {
+  border-color: var(--color-neon-magenta);
+  box-shadow: var(--shadow-neon-magenta);
+}
+
+/* Roster tags: neon hover glow */
+.roster-tag {
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.roster-tag:hover {
+  box-shadow: var(--shadow-neon-cyan);
+}
+
+.roster-tag[data-submitted='true']:hover {
+  box-shadow: 0 0 8px rgba(57, 255, 136, 0.6), 0 0 20px rgba(57, 255, 136, 0.25);
+}
+
+/* Leaderboard: glow highlight for the top-ranked (fastest correct) entry */
+.leaderboard__list li:first-child {
+  color: var(--color-neon-yellow);
+  text-shadow: 0 0 6px rgba(247, 255, 0, 0.6);
+  font-weight: 700;
+}
+
+.board-leaderboard {
+  animation: pulse-glow-cyan 2.4s ease-in-out infinite;
+}
+
+/* Avatar hover tooltip: shows Student ID and, once submitted, exact
+   response speed. Implemented as a lightweight CSS-only tooltip driven by
+   the `data-tooltip` attribute set in app.js — no extra markup/dependency. */
+.avatar-token {
+  position: relative;
+  cursor: default;
+}
+
+.avatar-token:hover {
+  box-shadow: var(--shadow-neon-cyan);
+  z-index: 5;
+}
+
+.avatar-token[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--color-bg-panel-alt);
+  border: 1px solid var(--color-neon-cyan);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  box-shadow: var(--shadow-neon-cyan);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10;
+}
+
+.avatar-token[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.avatar-token[data-correct='true'][data-tooltip]::after {
+  border-color: var(--color-neon-green);
+  box-shadow: 0 0 8px rgba(57, 255, 136, 0.6), 0 0 20px rgba(57, 255, 136, 0.25);
+}
+
+.avatar-token[data-correct='false'][data-tooltip]::after {
+  border-color: var(--color-neon-red);
+  box-shadow: 0 0 8px rgba(255, 56, 96, 0.6), 0 0 20px rgba(255, 56, 96, 0.25);
+}
