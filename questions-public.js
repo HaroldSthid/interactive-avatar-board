@@ -22,28 +22,28 @@
 const QUESTIONS_PUBLIC = [
   {
     id: 1,
-    text: '¿Cuál es la capital de Francia?',
-    options: { A: 'Madrid', B: 'París', C: 'Roma', D: 'Berlín' },
+    text: '¿Cuál es la función principal de un HTML en un producto o sitio web?',
+    options: { A: 'Le da animación y efectos visuales interactivos.', B: 'Procesa bases de datos y pagos en línea.', C: 'Construye la estructura, el texto y el esqueleto de la página.', D: 'Sirve únicamente para subir archivos a la nube.' },
   },
   {
     id: 2,
-    text: '¿Cuánto es 7 x 8?',
-    options: { A: '54', B: '48', C: '56', D: '64' },
+    text: '¿Si deseas modificar los colores, la tipografía y los espacios visuales de tu Onepage, ¿qué lenguaje debes usar?',
+    options: { A: 'CSS', B: 'Python', C: 'HTML', D: 'JavaScript' },
   },
   {
     id: 3,
-    text: '¿Cuál es el planeta más cercano al Sol?',
-    options: { A: 'Venus', B: 'Tierra', C: 'Marte', D: 'Mercurio' },
+    text: '¿Qué aporta JavaScript (JS) a una página o aplicación web?',
+    options: { A: 'Es la herramienta para guardar imágenes en el servidor.', B: 'Le otorga comportamiento dinámico e interactividad a la interfaz.', C: 'Es el estándar para poner texto en negrita.', D: 'Reemplaza por completo el uso de HTML y CSS.' },
   },
   {
     id: 4,
-    text: '¿En qué año se declaró la independencia de Argentina?',
-    options: { A: '1810', B: '1816', C: '1853', D: '1880' },
+    text: '¿En el proyecto de la carpeta "Onepage", ¿por qué es importante subir el screenshot de los cambios y la bitácora de prompts?',
+    options: { A: 'Para demostrar que memorizaste el código completo de memoria.', B: 'Para sustituir la entrega del código en GitHub.', C: 'Para ocultar los errores cometidos durante la prueba.', D: 'Para dejar una evidencia visible de tu exploración y medir lo que aprendiste.' },
   },
   {
     id: 5,
-    text: '¿Cuál es el río más largo del mundo?',
-    options: { A: 'Nilo', B: 'Amazonas', C: 'Paraná', D: 'Misisipi' },
+    text: '¿Qué ventaja práctica te ofrece usar Google Colab en lugar de instalar programas pesados en tu computador?',
+    options: { A: 'Es un servicio para escuchar música en streaming.', B: 'Permite ejecutar código Python directamente en la nube desde el navegador de forma segura.', C: 'Funciona únicamente como procesador de texto para cartas.', D: 'Sirve para crear animaciones 3D avanzadas' },
   },
   {
     id: 6,
