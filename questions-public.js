@@ -22,28 +22,28 @@
 const QUESTIONS_PUBLIC = [
   {
     id: 1,
-    text: '¿Cuál es la función principal de un HTML en un producto o sitio web?',
-    options: { A: 'Le da animación y efectos visuales interactivos.', B: 'Procesa bases de datos y pagos en línea.', C: 'Construye la estructura, el texto y el esqueleto de la página.', D: 'Sirve únicamente para subir archivos a la nube.' },
+    text: '¿Cuál es la función principal de HTML en un sitio web?',
+    options: { A: 'Animaciones y efectos visuales.', B: 'Pagos y bases de datos.', C: 'Estructura y esqueleto del sitio.', D: 'Subir archivos a la nube.' },
   },
   {
     id: 2,
-    text: '¿Si deseas modificar los colores, la tipografía y los espacios visuales de tu Onepage, ¿qué lenguaje debes usar?',
+    text: '¿Qué lenguaje usas para modificar colores, fuentes y espacios visuales?',
     options: { A: 'CSS', B: 'Python', C: 'HTML', D: 'JavaScript' },
   },
   {
     id: 3,
-    text: '¿Qué aporta JavaScript (JS) a una página o aplicación web?',
-    options: { A: 'Es la herramienta para guardar imágenes en el servidor.', B: 'Le otorga comportamiento dinámico e interactividad a la interfaz.', C: 'Es el estándar para poner texto en negrita.', D: 'Reemplaza por completo el uso de HTML y CSS.' },
+    text: '¿Qué aporta JavaScript (JS) a una aplicación web?',
+    options: { A: 'Guardar fotos en el servidor.', B: 'Interactividad y comportamiento dinámico.', C: 'Formato de texto simple.', D: 'Reemplazar a HTML y CSS.' },
   },
   {
     id: 4,
-    text: '¿En el proyecto de la carpeta "Onepage", ¿por qué es importante subir el screenshot de los cambios y la bitácora de prompts?',
-    options: { A: 'Para demostrar que memorizaste el código completo de memoria.', B: 'Para sustituir la entrega del código en GitHub.', C: 'Para ocultar los errores cometidos durante la prueba.', D: 'Para dejar una evidencia visible de tu exploración y medir lo que aprendiste.' },
+    text: 'En "Onepage", ¿por qué subir el screenshot y la bitácora de prompts?',
+    options: { A: 'Demostrar memorización del código.', B: 'Evitar subir archivos a GitHub.', C: 'Ocultar errores de la prueba.', D: 'Dejar evidencia visible del aprendizaje.' },
   },
   {
     id: 5,
-    text: '¿Qué ventaja práctica te ofrece usar Google Colab en lugar de instalar programas pesados en tu computador?',
-    options: { A: 'Es un servicio para escuchar música en streaming.', B: 'Permite ejecutar código Python directamente en la nube desde el navegador de forma segura.', C: 'Funciona únicamente como procesador de texto para cartas.', D: 'Sirve para crear animaciones 3D avanzadas' },
+    text: '¿Ventaja práctica de usar Google Colab en lugar de programas pesados?',
+    options: { A: 'Reproducir música en streaming.', B: 'Correr Python en la nube desde el navegador.', C: 'Procesar únicamente cartas de texto.', D: 'Crear animaciones 3D.' },
   },
   {
     id: 6,
