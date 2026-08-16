@@ -77,7 +77,7 @@ El juego arranca con **20 preguntas de ejemplo**. El orden es **aleatorio** (no 
 
 - Depende de que el servidor relay (`server/`) esté levantado y accesible — si el relay se cae, se cae el juego entero para todos los conectados (host y estudiantes). Ya no hay dependencia de WiFi compartida, aislamiento de clientes, ni servidores TURN: todo el tráfico pasa por el relay, no por conexiones P2P directas entre dispositivos.
 - El relay corre en el free tier de Render, que duerme la instancia tras un rato sin tráfico. El servidor se auto-hace ping cada 10 minutos para evitar ese cold start (ver `server/README.md`); si ese mecanismo falla o se desactiva, el primer host de la clase puede tardar hasta ~60s en conectar mientras la instancia se despierta.
-- La URL del relay en `app.js` (`RELAY_URL`) todavía apunta a un placeholder hasta que se haga el deploy real a Render — ver `server/README.md` para los pasos de deploy y actualización de esa URL.
+- El relay está desplegado en `https://avatar-board-relay.onrender.com` (Render free tier) — ver `server/README.md` para redeploy o cambio de URL si hace falta.
 - Si un estudiante real se une **después** de activar el simulador, el simulador no genera estudiantes mock nuevos (no se mezclan automáticamente).
 - No hay manejo robusto de desconexión: si un estudiante pierde la conexión, su avatar no se limpia ni se marca automáticamente.
 - La separación entre `questions-public.js` y `answers.json` es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.

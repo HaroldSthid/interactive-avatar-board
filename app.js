@@ -1109,7 +1109,8 @@ const QUESTION_DURATION_MS = 20000;
  * no env injection, so the URL is a plain constant with a hostname-based dev
  * override — `node server/src/index.js` plus a locally-served index.html
  * keep working unchanged, no config file or extra request needed.
- * TODO: confirm final Render service URL after deploy.
+ * Confirmed deployed at https://avatar-board-relay.onrender.com (health
+ * check returns 200) as of 2026-08-15.
  */
 const RELAY_URL = ['localhost', '127.0.0.1'].includes(location.hostname)
   ? 'ws://localhost:8080'
