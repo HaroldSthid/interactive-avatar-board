@@ -1,6 +1,6 @@
 # Interactive Avatar Board
 
-Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sala, los estudiantes se conectan desde su celular o compu y compiten para responder más rápido. Funciona 100% P2P vía PeerJS, sin backend propio — se juega directo desde el navegador.
+Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sala, los estudiantes se conectan desde su celular o compu y compiten para responder más rápido. El frontend sigue siendo estático (se sirve desde GitHub Pages), pero ahora sincroniza a los jugadores a través de un servidor relay propio por WebSocket (`server/`, desplegado en Render) en vez de conexiones P2P directas.
 
 **Link en vivo**: https://haroldsthid.github.io/interactive-avatar-board/
 
@@ -75,7 +75,9 @@ El juego arranca con **20 preguntas de ejemplo**. El orden es **aleatorio** (no 
 
 ## Limitaciones conocidas
 
-- Depende del servidor de señalización público de PeerJS (puede fallar o tener latencia si ese servicio tiene problemas). Si tenés estudiantes en redes distintas (WiFi de la escuela + datos móviles) o el WiFi tiene "aislamiento de clientes", agregamos un servidor TURN de respaldo — probá primero con pocos dispositivos antes de la clase completa.
+- Depende de que el servidor relay (`server/`) esté levantado y accesible — si el relay se cae, se cae el juego entero para todos los conectados (host y estudiantes). Ya no hay dependencia de WiFi compartida, aislamiento de clientes, ni servidores TURN: todo el tráfico pasa por el relay, no por conexiones P2P directas entre dispositivos.
+- El relay corre en el free tier de Render, que duerme la instancia tras un rato sin tráfico. El servidor se auto-hace ping cada 10 minutos para evitar ese cold start (ver `server/README.md`); si ese mecanismo falla o se desactiva, el primer host de la clase puede tardar hasta ~60s en conectar mientras la instancia se despierta.
+- La URL del relay en `app.js` (`RELAY_URL`) todavía apunta a un placeholder hasta que se haga el deploy real a Render — ver `server/README.md` para los pasos de deploy y actualización de esa URL.
 - Si un estudiante real se une **después** de activar el simulador, el simulador no genera estudiantes mock nuevos (no se mezclan automáticamente).
 - No hay manejo robusto de desconexión: si un estudiante pierde la conexión, su avatar no se limpia ni se marca automáticamente.
 - La separación entre `questions-public.js` y `answers.json` es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.

@@ -307,8 +307,8 @@ function scheduleSimulatedSubmissions() {
  * current question, ignored outside ACTIVE_QUESTION.
  * @param {string} studentId
  * @param {string} choice - one of QUADRANTS
- * @param {number} [timestamp] - defaults to Date.now() (simulator); real P2P
- *   submissions pass a host-clock-relative timestamp derived from the
+ * @param {number} [timestamp] - defaults to Date.now() (simulator); real
+ *   relay submissions pass a host-clock-relative timestamp derived from the
  *   student's reported elapsed time to avoid cross-device clock skew.
  */
 function recordSubmission(studentId, choice, timestamp = Date.now()) {

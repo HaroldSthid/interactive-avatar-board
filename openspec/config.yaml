@@ -1,8 +1,8 @@
 schema: spec-driven
 
 context: |
-  Tech stack: Vanilla HTML5/CSS/ES6 modules, PeerJS (CDN), no build tooling
-  Architecture: Single-Page App (SPA) with dual views (Teacher/Student), P2P sync via WebRTC
+  Tech stack: Vanilla HTML5/CSS/ES6 modules (frontend), Node + `ws` WebSocket relay server (`server/`), no build tooling
+  Architecture: Single-Page App (SPA) with dual views (Teacher/Student), synced via a WebSocket relay backend (`server/`, deployed to Render)
   Testing: No test framework (strict TDD unavailable)
   Style: Cyberpunk theme with CSS Grid/Flexbox, custom animations, dynamic neon UI
 

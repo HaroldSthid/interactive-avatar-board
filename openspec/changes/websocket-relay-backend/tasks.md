@@ -139,25 +139,26 @@ Rationale: this change has two independently reviewable halves — a brand-new `
 
 ## Phase 5: Documentation & Spec Cleanup (PR 5)
 
-- [ ] Task 23: Rewrite `README.md:3` — drop "Funciona 100% P2P vía PeerJS, sin backend propio"; describe the relay-backed architecture instead.
+- [x] Task 23: Rewrite `README.md:3` — drop "Funciona 100% P2P vía PeerJS, sin backend propio"; describe the relay-backed architecture instead.
   - Satisfies: `proposal.md` In Scope — rewrite README.md:3
   - Depends on: Phase 4 complete (describes the shipped architecture)
   - Parallelizable: yes (can be drafted earlier, but should land after Phase 4 to avoid describing unshipped behavior)
 
-- [ ] Task 24: Rewrite `README.md:76-78` "Limitaciones conocidas" — remove the PeerJS signaling-server / same-WiFi / client-isolation / TURN-backup limitation; add the relay-server-dependency and cold-start limitation (with the pre-class warm-up guidance from `proposal.md`).
+- [x] Task 24: Rewrite `README.md:76-78` "Limitaciones conocidas" — remove the PeerJS signaling-server / same-WiFi / client-isolation / TURN-backup limitation; add the relay-server-dependency and cold-start limitation (with the pre-class warm-up guidance from `proposal.md`).
   - Satisfies: `proposal.md` In Scope — rewrite known-limitations section
   - Depends on: Task 23
   - Parallelizable: no
 
-- [ ] Task 25: Update `openspec/config.yaml:4-5` context block — stack description moves from "PeerJS (CDN), ... P2P sync via WebRTC" to "WebSocket relay (`server/`, Node + `ws`)".
+- [x] Task 25: Update `openspec/config.yaml:4-5` context block — stack description moves from "PeerJS (CDN), ... P2P sync via WebRTC" to "WebSocket relay (`server/`, Node + `ws`)".
   - Satisfies: `proposal.md` Affected Areas — openspec/config.yaml
   - Depends on: nothing
   - Parallelizable: yes
 
-- [ ] Task 26: Grep the full repo (`app.js`, `index.html`, `README.md`, `openspec/specs/**`) for any remaining `peerjs`, `PeerJS`, `WebRTC`, `TURN`, `DataConnection` references and remove/update them.
+- [x] Task 26: Grep the full repo (`app.js`, `index.html`, `README.md`, `openspec/specs/**`) for any remaining `peerjs`, `PeerJS`, `WebRTC`, `TURN`, `DataConnection` references and remove/update them.
   - Satisfies: `proposal.md` Success Criteria — no PeerJS/WebRTC/TURN references remain
   - Depends on: Task 24, Task 25, Task 22
   - Parallelizable: no
+  - Note: `openspec/specs/avatar-board/spec.md` (the main, non-`changes/` spec) was intentionally left untouched per explicit apply-phase instruction — it only gets updated when the change's spec delta merges in at archive time. `app.js` retained one stale "P2P" word in a doc comment, which was reworded to "relay"; the file's historical comments describing the PeerJS→WebSocket transition were kept as accurate history, not stale claims.
 
 ---
 
@@ -167,31 +168,37 @@ Rationale: this change has two independently reviewable halves — a brand-new `
   - Satisfies: `proposal.md` Success Criteria — 40 concurrent students on mixed networks; `design.md` §6 Testing Strategy — Cross-network layer
   - Depends on: Task 22, and a deployed (or tunneled) relay server reachable from outside localhost
   - Parallelizable: no
+  - **NOT completed in PR 5** — requires a real deployed/tunneled relay reachable from an actual phone on mobile data. Not verifiable by an agent without physical devices and a real network. Needs the user's real-world test after Render deploy.
 
-- [ ] Task 28: Fan-out test — script N headless `ws` clients (or use N phone/tabs) sending `HELLO`+`JOIN`+`SUBMIT`; confirm the host roster shows all N students and no submissions are dropped, at N≈40.
+- [x] Task 28: Fan-out test — script N headless `ws` clients (or use N phone/tabs) sending `HELLO`+`JOIN`+`SUBMIT`; confirm the host roster shows all N students and no submissions are dropped, at N≈40.
   - Satisfies: `proposal.md` Success Criteria — 40 concurrent students without drops; `design.md` §6 Testing Strategy — Fan-out layer
   - Depends on: Task 27
   - Parallelizable: no
+  - Verified via a scratch headless-`ws` script (N=40) against the relay running locally: all 40 HELLO/HELLO_ACK + JOIN succeeded, host roster showed all 40, all 40 SUBMITs relayed to the host with correct attribution and zero cross-talk between students. This validates the relay's concurrency handling architecturally (no more single-browser-tab bottleneck); it does not replace Task 27's real cross-network test with physical devices.
 
 - [ ] Task 29: Payload test — join with a real phone JPG avatar (~80KB base64); confirm it renders on the board after relay.
   - Satisfies: `design.md` §6 Testing Strategy — Payload layer
   - Depends on: Task 22
   - Parallelizable: yes (independent of Task 27/28)
+  - **NOT completed in PR 5** — requires a real phone-captured JPG and a browser to render the board. Not verifiable by an agent. Needs the user's real-world test.
 
 - [ ] Task 30: Cold-start test — leave the deployed Render service idle 20+ minutes, then click "Start Hosting": with self-ping active, connect should be under 5s (proposal Success Criteria); temporarily disable self-ping once to confirm the "Waking server…" UI (Task 21) appears instead of a hang.
   - Satisfies: `proposal.md` Success Criteria — host connects in under 5s when warm; `design.md` §6 Testing Strategy — Cold start layer
   - Depends on: Phase 2 deployed to Render, Task 21
   - Parallelizable: yes (independent of Task 27-29)
+  - **NOT completed in PR 5 (requires a real Render deploy)** — but the self-ping *configuration* was re-verified by reading `server/src/index.js`: `SELF_PING_INTERVAL_MS = 10 * 60_000` (10 min) pings `RENDER_EXTERNAL_URL + '/health'` on a `setInterval`, skipped when `RENDER_EXTERNAL_URL` is absent (confirmed local dev is unaffected). 10 minutes is safely under Render free-tier's ~15-minute inactivity sleep threshold, so the interval is correctly configured to prevent cold-sleep between pings. Actual behavior against a live Render instance still needs the user's real deploy test.
 
-- [ ] Task 31: Lifecycle test — close the host tab; every connected student must show "Host disconnected" (close code `4001`); re-registering the same Room ID afterward must succeed.
+- [x] Task 31: Lifecycle test — close the host tab; every connected student must show "Host disconnected" (close code `4001`); re-registering the same Room ID afterward must succeed.
   - Satisfies: `design.md` decision #3 (Host disconnect); §6 Testing Strategy — Lifecycle layer
   - Depends on: Task 27
   - Parallelizable: no
+  - Verified via the same scratch script (adapted from PR 3's manual test approach, run headless instead of two browser tabs): closing the host socket closed all 40 student sockets with code `4001`, and re-`HELLO`ing the same Room ID afterward succeeded (room was correctly deleted from the registry), confirming `rooms.js` `dropSocket`/`closeRoom` behave as designed.
 
 - [ ] Task 32: Regression check — run offline simulator mode and a full 5-question hosted session; confirm scoring, countdown, leaderboard, and final ranking behave exactly as before this change (proposal Non-Goals: no changes to scoring/timer/avatar/question-bank logic).
   - Satisfies: `design.md` §6 Testing Strategy — Regression layer; `proposal.md` Out of Scope
   - Depends on: Task 22
   - Parallelizable: yes (independent of Task 27-30)
+  - **NOT completed in PR 5** — requires interactively driving the app in a real browser session (simulator mode + a full hosted game), which an agent cannot do without a real browser UI. This logic was untouched by PR 4 (only the transport layer changed), so regression risk is low, but it still needs the user's manual click-through before calling this fully verified.
 
 ---
 
