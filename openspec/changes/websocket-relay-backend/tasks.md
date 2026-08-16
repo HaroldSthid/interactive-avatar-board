@@ -75,62 +75,62 @@ Rationale: this change has two independently reviewable halves — a brand-new `
 
 ## Phase 4: Client Transport Swap (PR 4)
 
-- [ ] Task 11: Add the `RELAY_URL` constant near the top of `app.js`'s network section — `wss://` production URL with a `location.hostname`-based `ws://localhost:8080` dev override (per `design.md` decision #5).
+- [x] Task 11: Add the `RELAY_URL` constant near the top of `app.js`'s network section — `wss://` production URL with a `location.hostname`-based `ws://localhost:8080` dev override (per `design.md` decision #5).
   - Satisfies: `design.md` §5 (client code block)
   - Depends on: nothing (can start once Phase 3 server contract is stable; does not require the server to be deployed yet)
   - Parallelizable: yes
 
-- [ ] Task 12: Rewrite `initHostPeer(attempt)` → `initHostSocket(attempt)` (app.js ~1257-1310 area): open a `WebSocket` to `RELAY_URL`, send `HELLO{role:'host', roomId}` on `open`, `navigateTo('board')` on `HELLO_ACK`, retry with a new Room ID (respecting `HOST_ID_RETRY_LIMIT`) on `ERROR{code:'ROOM_TAKEN'}`. Delete `PEER_OPTIONS` and the `new Peer(...)` call.
+- [x] Task 12: Rewrite `initHostPeer(attempt)` → `initHostSocket(attempt)` (app.js ~1257-1310 area): open a `WebSocket` to `RELAY_URL`, send `HELLO{role:'host', roomId}` on `open`, `navigateTo('board')` on `HELLO_ACK`, retry with a new Room ID (respecting `HOST_ID_RETRY_LIMIT`) on `ERROR{code:'ROOM_TAKEN'}`. Delete `PEER_OPTIONS` and the `new Peer(...)` call.
   - Satisfies: `specs/avatar-board/spec.md` — Host Connection Setup; `specs/relay-server/spec.md` — Room Registration
   - Depends on: Task 8, Task 11
   - Parallelizable: no
 
-- [ ] Task 13: Rewrite `destroyHostPeer()` → `destroyHostSocket()`: `socket.close()`, clear `gameState.hostSocket`/`roomId`. Delete `handleIncomingConnection(conn)` entirely (no longer needed — one socket, no per-peer wiring).
+- [x] Task 13: Rewrite `destroyHostPeer()` → `destroyHostSocket()`: `socket.close()`, clear `gameState.hostSocket`/`roomId`. Delete `handleIncomingConnection(conn)` entirely (no longer needed — one socket, no per-peer wiring).
   - Satisfies: `design.md` §5 Client function mapping
   - Depends on: Task 12
   - Parallelizable: no
 
-- [ ] Task 14: Rewrite `handleHostMessage(conn, message)` → `handleHostMessage(message)` (app.js ~1337-1399): drop the `conn` parameter from the signature and all call sites; switch body on `message.type` stays identical (still only handles the 6 existing game message types, never sees `HELLO`).
+- [x] Task 14: Rewrite `handleHostMessage(conn, message)` → `handleHostMessage(message)` (app.js ~1337-1399): drop the `conn` parameter from the signature and all call sites; switch body on `message.type` stays identical (still only handles the 6 existing game message types, never sees `HELLO`).
   - Satisfies: `specs/avatar-board/spec.md` — unchanged game-plane requirements (Real-time Answer Submission, etc.); `proposal.md` non-goal "no new game message types"
   - Depends on: Task 12
   - Parallelizable: no
 
-- [ ] Task 15: Rewrite `registerRealStudent(conn, ...)` → `registerRealStudent(studentId, avatar, avatarImage)` — `JOIN_ACK` is sent back through the relay socket instead of a per-connection `conn.send`.
+- [x] Task 15: Rewrite `registerRealStudent(conn, ...)` → `registerRealStudent(studentId, avatar, avatarImage)` — `JOIN_ACK` is sent back through the relay socket instead of a per-connection `conn.send`.
   - Satisfies: `specs/avatar-board/spec.md` — Student Registration and Joining
   - Depends on: Task 14
   - Parallelizable: no
 
-- [ ] Task 16: Rewrite `broadcastToStudents(message)` (app.js ~1399-1414, plus call sites at 564, 617, 1041): single `hostSocket.send(JSON.stringify(message))` — the server now fans out to students, so the client no longer iterates `gameState.connections`. Remove the `gameState.connections.forEach(...)` reset block at app.js ~629-636 (replace with clearing `gameState.hostSocket`/`relaySocket` as appropriate).
+- [x] Task 16: Rewrite `broadcastToStudents(message)` (app.js ~1399-1414, plus call sites at 564, 617, 1041): single `hostSocket.send(JSON.stringify(message))` — the server now fans out to students, so the client no longer iterates `gameState.connections`. Remove the `gameState.connections.forEach(...)` reset block at app.js ~629-636 (replace with clearing `gameState.hostSocket`/`relaySocket` as appropriate).
   - Satisfies: `specs/relay-server/spec.md` — Message Relay Routing (host-to-students broadcast)
   - Depends on: Task 14
   - Parallelizable: no
 
-- [ ] Task 17: Rewrite `joinRoom(roomId, studentId, avatar, avatarImage)` (app.js ~1415-1450): same call signature, but internally opens a `WebSocket` to `RELAY_URL`, sends `HELLO{role:'student', roomId}`, and on `HELLO_ACK` sends the existing `JOIN` message (per the corrected Task-1 spec flow); on `ERROR{code:'ROOM_NOT_FOUND'}` surfaces the existing "room not found" UI state.
+- [x] Task 17: Rewrite `joinRoom(roomId, studentId, avatar, avatarImage)` (app.js ~1415-1450): same call signature, but internally opens a `WebSocket` to `RELAY_URL`, sends `HELLO{role:'student', roomId}`, and on `HELLO_ACK` sends the existing `JOIN` message (per the corrected Task-1 spec flow); on `ERROR{code:'ROOM_NOT_FOUND'}` surfaces the existing "room not found" UI state.
   - Satisfies: `specs/avatar-board/spec.md` — Student Registration and Joining; `specs/relay-server/spec.md` — Student Room Join
   - Depends on: Task 8, Task 11
   - Parallelizable: yes (independent of Tasks 12-16 — host and student code paths don't share state)
 
-- [ ] Task 18: Rewrite `handleClientMessage(message)` (app.js ~1451+): unchanged switch body, now fed `JSON.parse(event.data)` from the relay socket's `message` event instead of a PeerJS `DataConnection`'s `data` event.
+- [x] Task 18: Rewrite `handleClientMessage(message)` (app.js ~1451+): unchanged switch body, now fed `JSON.parse(event.data)` from the relay socket's `message` event instead of a PeerJS `DataConnection`'s `data` event.
   - Satisfies: `specs/avatar-board/spec.md` — unchanged game-plane requirements
   - Depends on: Task 17
   - Parallelizable: no
 
-- [ ] Task 19: Update the submit guard at app.js ~1570-1580 from `if (!gameState.hostConnection || !gameState.hostConnection.open) return;` / `gameState.hostConnection.send({...})` to a `readyState === WebSocket.OPEN` check and `JSON.stringify` + `send`. Rename `gameState.peer`/`studentPeer`/`hostConnection`/`connections` fields (app.js ~225-229) to `gameState.hostSocket` and `gameState.relaySocket`.
+- [x] Task 19: Update the submit guard at app.js ~1570-1580 from `if (!gameState.hostConnection || !gameState.hostConnection.open) return;` / `gameState.hostConnection.send({...})` to a `readyState === WebSocket.OPEN` check and `JSON.stringify` + `send`. Rename `gameState.peer`/`studentPeer`/`hostConnection`/`connections` fields (app.js ~225-229) to `gameState.hostSocket` and `gameState.relaySocket`.
   - Satisfies: `design.md` §4 File Changes (app.js 629-636, 1570); §5 gameState field mapping
   - Depends on: Task 18
   - Parallelizable: no
 
-- [ ] Task 20: Delete the PeerJS CDN `<script>` tag at `index.html:160-161`.
+- [x] Task 20: Delete the PeerJS CDN `<script>` tag at `index.html:160-161`.
   - Satisfies: `proposal.md` In Scope — remove PeerJS CDN tag
   - Depends on: nothing
   - Parallelizable: yes
 
-- [ ] Task 21: Add the host-side "connecting/waking" UI state: after 3s without `HELLO_ACK`, show "Waking server… up to 60s"; after 90s, show an error state (per `design.md` §5 Cold start).
+- [x] Task 21: Add the host-side "connecting/waking" UI state: after 3s without `HELLO_ACK`, show "Waking server… up to 60s"; after 90s, show an error state (per `design.md` §5 Cold start).
   - Satisfies: `proposal.md` — cold-start mitigation UI
   - Depends on: Task 12
   - Parallelizable: no
 
-- [ ] Task 22: Manual verification — 2-device smoke test: host + one student tab against `ws://localhost:8080` (needs Phase 3 server running locally), devtools WS frame inspector to confirm all 6 game message types round-trip with unmodified payload shapes; also confirm `HELLO`/`HELLO_ACK` never reach `handleHostMessage`/`handleClientMessage`.
+- [x] Task 22: Manual verification — 2-device smoke test: host + one student tab against `ws://localhost:8080` (needs Phase 3 server running locally), devtools WS frame inspector to confirm all 6 game message types round-trip with unmodified payload shapes; also confirm `HELLO`/`HELLO_ACK` never reach `handleHostMessage`/`handleClientMessage`.
   - Satisfies: `design.md` §6 Testing Strategy — Transport layer; `proposal.md` Success Criteria (all 6 message types round-trip)
   - Depends on: Task 10, Task 19, Task 20
   - Parallelizable: no

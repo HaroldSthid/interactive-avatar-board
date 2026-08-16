@@ -5,10 +5,12 @@
  * Phase 1 (Foundation): view router + view toggles.
  * Phase 2 (Offline Simulation Engine): local state machine, teacher dashboard
  * controls, mock client generator, and random submission simulator.
- * Phase 3 (P2P Connection & Dynamic Animation): PeerJS host/client wiring,
- * Room ID generation, JOIN/SUBMIT/START_QUESTION/ROUND_END network protocol,
+ * Phase 3 (P2P Connection & Dynamic Animation): host/client wiring, Room ID
+ * generation, JOIN/SUBMIT/START_QUESTION/ROUND_END network protocol,
  * avatar-token movement between the starting line and quadrant lanes, and
- * the speed ranking (leaderboard) engine.
+ * the speed ranking (leaderboard) engine. Originally built on PeerJS
+ * (WebRTC); Phase 4 swapped the transport to a WebSocket relay server
+ * (`server/`) — see the "WebSocket Relay Network Protocol" section below.
  *
  * Phase 4 (Verification & Polish): dynamic `data-state` wiring for the
  * cyberpunk glow/active-state CSS, avatar hover tooltips (Student ID +
@@ -83,18 +85,18 @@ function initViewToggles() {
     });
   }
 
-  // Host form: initializes the PeerJS host peer (Room ID + listener) and
-  // navigates to the Board view once the connection is open.
+  // Host form: opens the relay socket (Room ID + HELLO handshake) and
+  // navigates to the Board view once the relay confirms with HELLO_ACK.
   if (formHost) {
     formHost.addEventListener('submit', (event) => {
       event.preventDefault();
       setHostStatus('Connecting...');
-      initHostPeer();
+      initHostSocket();
     });
   }
 
-  // Student form: joins the host's room via PeerJS (JOIN handshake) and
-  // navigates to the Controller view.
+  // Student form: joins the host's room via the relay (HELLO + JOIN
+  // handshake) and navigates to the Controller view.
   if (formStudent) {
     formStudent.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -146,7 +148,7 @@ function initViewToggles() {
 
   if (btnBackToSetupBoard) {
     btnBackToSetupBoard.addEventListener('click', () => {
-      destroyHostPeer();
+      destroyHostSocket();
       navigateTo('setup');
     });
   }
@@ -187,10 +189,10 @@ const SIMULATOR_MIN_DELAY_MS = 500;
 const SIMULATOR_MAX_DELAY_MS = 4000;
 
 /**
- * Local (offline) game state. `students`/`submissions` mock what will later
- * arrive over PeerJS in Phase 3; the shape mirrors the JOIN/SUBMIT payloads
- * documented in the design's P2P protocol so Phase 3 can plug in network
- * events instead of the simulator with minimal changes.
+ * Local (offline) game state. `students`/`submissions` mock what also
+ * arrives over the WebSocket relay; the shape mirrors the JOIN/SUBMIT
+ * payloads documented in the network protocol above so the simulator and
+ * real network events share the same downstream rendering/scoring code.
  */
 const gameState = {
   current: GAME_STATES.LOBBY,
@@ -217,16 +219,14 @@ const gameState = {
   totalScores: {},
   finalRanking: [], // [{ studentId, score }], set by endSession(), descending by score
 
-  // --- PeerJS (Phase 3) ---
-  peer: null, // host: this device's PeerJS Peer instance
-  roomId: null, // host: the Room ID this peer is listening on
-  connections: [], // host: [{ conn, studentId }] for connected students
+  // --- WebSocket relay (Phase 4) ---
+  hostSocket: null, // host: this device's WebSocket connection to the relay
+  roomId: null, // host: the Room ID registered with the relay
   // Correct-answer key ({ [questionId]: 'A'|'B'|'C'|'D' }), fetched lazily
-  // from answers.json ONLY on the host code path (see initHostPeer()), so
+  // from answers.json ONLY on the host code path (see initHostSocket()), so
   // students never load it just by opening the app. null until fetched.
   answerKey: null,
-  studentPeer: null, // student: this device's PeerJS Peer instance
-  hostConnection: null, // student: DataConnection to the host
+  relaySocket: null, // student: this device's WebSocket connection to the relay
   studentId: null, // student: this device's Student ID
   controllerQuestionStartedAt: null, // student: local clock ref for elapsed time
   controllerCurrentQuestionId: null, // student: questionId of the active question
@@ -541,7 +541,7 @@ function startNewQuestionRound() {
   // Pull the next question from the pre-configured public bank
   // (questions-public.js) via the shuffle bag (drawNextQuestion), and
   // pre-fill the host's "Correct Answer" select by looking up the answer key
-  // (answers.json, fetched lazily in initHostPeer()) — still overridable
+  // (answers.json, fetched lazily in initHostSocket()) — still overridable
   // manually afterwards.
   const question = drawNextQuestion();
 
@@ -626,14 +626,9 @@ function nextQuestion() {
 function resetGame() {
   gameState.hostCountdownStop?.();
   clearPendingSimulatorTimers();
-  gameState.connections.forEach(({ conn }) => {
-    try {
-      conn.close();
-    } catch (err) {
-      // ignore — connection may already be closed
-    }
-  });
-  gameState.connections = [];
+  // Note: the host no longer holds individual student sockets (the relay
+  // server owns those and fans out broadcasts) — Reset Game only clears
+  // local roster/score state, it can't force-disconnect students.
   gameState.students = [];
   gameState.submissions = [];
   gameState.lastLeaderboard = [];
@@ -1065,7 +1060,7 @@ function initDashboardControls() {
 }
 
 // ---------------------------------------------------------------------------
-// P2P Network Protocol (PeerJS) — Room ID generation, host/client wiring,
+// WebSocket Relay Network Protocol — Room ID generation, host/client wiring,
 // and the JOIN / SUBMIT / START_QUESTION / ROUND_END message protocol.
 //
 // Message shape: { type: 'JOIN' | 'JOIN_ACK' | 'SUBMIT' | 'START_QUESTION' |
@@ -1075,6 +1070,12 @@ function initDashboardControls() {
 // received START_QUESTION) rather than an absolute timestamp, so the host
 // can derive a timestamp on its own clock (questionStartedAt + timeElapsedMs)
 // and avoid cross-device clock-skew when computing speed rankings.
+//
+// Two planes flow over the same socket: a control plane (HELLO / HELLO_ACK /
+// ERROR — consumed here, at the socket layer, to establish role + room) and
+// the game plane above (the 6 message types, relayed byte-for-byte by the
+// server). handleHostMessage()/handleClientMessage() never see a control
+// frame — see CONTROL_TYPES below.
 // ---------------------------------------------------------------------------
 
 const MSG_TYPES = {
@@ -1086,6 +1087,15 @@ const MSG_TYPES = {
   SESSION_END: 'SESSION_END',
 };
 
+// Control-plane message types exchanged with the relay server to establish
+// role/room identity. Handled entirely inside initHostSocket()/joinRoom() —
+// never forwarded to handleHostMessage()/handleClientMessage().
+const CONTROL_TYPES = {
+  HELLO: 'HELLO',
+  HELLO_ACK: 'HELLO_ACK',
+  ERROR: 'ERROR',
+};
+
 const HOST_ID_RETRY_LIMIT = 5;
 
 // Per-question countdown duration — a single named constant so it's trivial
@@ -1095,48 +1105,27 @@ const HOST_ID_RETRY_LIMIT = 5;
 const QUESTION_DURATION_MS = 20000;
 
 /**
- * WebRTC ICE server config passed to every `Peer` (host and student).
- *
- * PeerJS's cloud broker only handles the initial signaling handshake — the
- * actual data connection is direct peer-to-peer and needs to traverse each
- * device's NAT. A STUN server alone (the PeerJS default) is enough when both
- * devices are on permissive networks, but fails ("connection failed" on the
- * student side) whenever the host and student are on different
- * networks/carriers, or on a Wi-Fi with client/AP isolation enabled (common
- * on school and office networks) — very likely scenarios for a classroom
- * with 40 students on their own phones. Adding a TURN server lets the
- * connection relay through a server instead of requiring a direct path.
- *
- * These are the Open Relay Project's public, free TURN credentials
- * (metered.ca) — rate-limited but fine for classroom-scale use. If it proves
- * unreliable at full scale, swap in a paid TURN provider (Twilio, Xirsys,
- * or metered.ca's own paid tier) here.
+ * WebSocket relay server URL. This is a static site with no build step and
+ * no env injection, so the URL is a plain constant with a hostname-based dev
+ * override — `node server/src/index.js` plus a locally-served index.html
+ * keep working unchanged, no config file or extra request needed.
+ * TODO: confirm final Render service URL after deploy.
  */
-const PEER_OPTIONS = {
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.relay.metered.ca:80' },
-      {
-        urls: 'turn:global.relay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:global.relay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:global.relay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-    ],
-  },
-};
+const RELAY_URL = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? 'ws://localhost:8080'
+  : 'wss://avatar-board-relay.onrender.com';
+
+// Cold-start UX: Render's free tier can take up to ~60s to wake an idle
+// service. The server self-pings to avoid this in practice, but the host UI
+// still needs a fallback so "Connecting..." doesn't look hung — show a
+// "waking server" hint after HOST_WAKE_HINT_MS without HELLO_ACK, and give
+// up with an error after HOST_WAKE_TIMEOUT_MS.
+const HOST_WAKE_HINT_MS = 3000;
+const HOST_WAKE_TIMEOUT_MS = 90000;
 
 /**
- * Generates a short, human-shareable Room ID suitable as a PeerJS peer ID.
+ * Generates a short, human-shareable Room ID used to register with the
+ * relay server.
  */
 function generateRoomId() {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -1249,17 +1238,14 @@ function resizeAvatarImageToDataUrl(file) {
 }
 
 /**
- * Initializes the host's PeerJS Peer with a generated Room ID and opens a
- * listener for incoming student connections. Retries with a new Room ID on
- * an `unavailable-id` collision, up to HOST_ID_RETRY_LIMIT attempts.
+ * Opens the host's WebSocket connection to the relay server and sends a
+ * HELLO control frame with a freshly generated Room ID. Moves to the Board
+ * view once the relay confirms with HELLO_ACK; retries with a new Room ID on
+ * an ERROR{code:'ROOM_TAKEN'} reply, up to HOST_ID_RETRY_LIMIT attempts
+ * (mirrors the previous PeerJS `unavailable-id` collision retry loop).
  * @param {number} [attempt]
  */
-function initHostPeer(attempt = 0) {
-  if (typeof Peer === 'undefined') {
-    setHostStatus('PeerJS unavailable');
-    return;
-  }
-
+function initHostSocket(attempt = 0) {
   // Lazily fetch the correct-answer key — ONLY on the host code path, ONLY
   // when hosting actually starts, and only once per session (not on every
   // question). Students never trigger this fetch just by opening the app.
@@ -1275,73 +1261,97 @@ function initHostPeer(attempt = 0) {
   }
 
   const roomId = generateRoomId();
-  const peer = new Peer(roomId, PEER_OPTIONS);
+  const socket = new WebSocket(RELAY_URL);
 
-  peer.on('open', (id) => {
-    gameState.peer = peer;
-    gameState.roomId = id;
-    setHostStatus(id);
-    const badge = document.getElementById('board-room-id');
-    if (badge) badge.textContent = `Room: ${id}`;
-    navigateTo('board');
+  const wakeHintTimer = setTimeout(() => {
+    setHostStatus('Waking server… up to 60s');
+  }, HOST_WAKE_HINT_MS);
+  const wakeTimeoutTimer = setTimeout(() => {
+    setHostStatus('Connection error: relay server unreachable');
+    socket.close();
+  }, HOST_WAKE_TIMEOUT_MS);
+  const clearWakeTimers = () => {
+    clearTimeout(wakeHintTimer);
+    clearTimeout(wakeTimeoutTimer);
+  };
+
+  socket.addEventListener('open', () => {
+    socket.send(JSON.stringify({ type: CONTROL_TYPES.HELLO, payload: { role: 'host', roomId } }));
   });
 
-  peer.on('connection', handleIncomingConnection);
-
-  peer.on('error', (err) => {
-    if (err && err.type === 'unavailable-id' && attempt < HOST_ID_RETRY_LIMIT) {
-      peer.destroy();
-      initHostPeer(attempt + 1);
+  socket.addEventListener('message', (event) => {
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch (err) {
       return;
     }
-    console.error('PeerJS host error:', err);
-    setHostStatus(`Connection error: ${(err && err.type) || 'unknown'}`);
+    if (!message || typeof message.type !== 'string') return;
+
+    if (message.type === CONTROL_TYPES.HELLO_ACK) {
+      clearWakeTimers();
+      gameState.hostSocket = socket;
+      gameState.roomId = roomId;
+      setHostStatus(roomId);
+      const badge = document.getElementById('board-room-id');
+      if (badge) badge.textContent = `Room: ${roomId}`;
+      navigateTo('board');
+      return;
+    }
+
+    if (message.type === CONTROL_TYPES.ERROR) {
+      const code = message.payload && message.payload.code;
+      if (code === 'ROOM_TAKEN' && attempt < HOST_ID_RETRY_LIMIT) {
+        clearWakeTimers();
+        socket.close();
+        initHostSocket(attempt + 1);
+        return;
+      }
+      clearWakeTimers();
+      console.error('Relay host error:', code);
+      setHostStatus(`Connection error: ${code || 'unknown'}`);
+      return;
+    }
+
+    handleHostMessage(message);
+  });
+
+  socket.addEventListener('error', (err) => {
+    console.error('Relay host socket error:', err);
+  });
+
+  socket.addEventListener('close', () => {
+    clearWakeTimers();
   });
 }
 
 /**
- * Tears down the host's PeerJS peer (and its signaling connection) so
- * leaving the Board without a page reload doesn't leak a stale room that
- * `initHostPeer()` would otherwise duplicate on the next "Start Hosting".
+ * Closes the host's relay socket so leaving the Board without a page reload
+ * doesn't leak a stale connection that `initHostSocket()` would otherwise
+ * duplicate on the next "Start Hosting".
  */
-function destroyHostPeer() {
-  if (gameState.peer) {
-    gameState.peer.destroy();
-    gameState.peer = null;
+function destroyHostSocket() {
+  if (gameState.hostSocket) {
+    gameState.hostSocket.close();
+    gameState.hostSocket = null;
   }
   gameState.roomId = null;
-  gameState.connections = [];
 }
 
 /**
- * Wires a newly-opened incoming DataConnection to the host message handler.
- * @param {DataConnection} conn
- */
-function handleIncomingConnection(conn) {
-  conn.on('data', (data) => handleHostMessage(conn, data));
-
-  conn.on('close', () => {
-    gameState.connections = gameState.connections.filter((entry) => entry.conn !== conn);
-  });
-
-  conn.on('error', (err) => {
-    console.error('PeerJS host connection error:', err);
-  });
-}
-
-/**
- * Handles an incoming message from a student's DataConnection.
- * @param {DataConnection} conn
+ * Handles an incoming game-plane message relayed to the host socket. The
+ * relay server never forwards control frames (HELLO/HELLO_ACK/ERROR) here —
+ * those are consumed by initHostSocket()'s own message listener.
  * @param {{type: string, payload: object}} message
  */
-function handleHostMessage(conn, message) {
+function handleHostMessage(message) {
   if (!message || typeof message.type !== 'string') return;
 
   switch (message.type) {
     case MSG_TYPES.JOIN: {
       const { studentId, avatar, avatarImage } = message.payload || {};
       if (!studentId) return;
-      registerRealStudent(conn, studentId, avatar, avatarImage);
+      registerRealStudent(studentId, avatar, avatarImage);
       break;
     }
     case MSG_TYPES.SUBMIT: {
@@ -1359,14 +1369,14 @@ function handleHostMessage(conn, message) {
 /**
  * Registers a real (network-connected) student on the board, reusing the
  * same students/roster/avatar-token pipeline as the offline simulator, then
- * acknowledges the JOIN back to the student.
- * @param {DataConnection} conn
+ * acknowledges the JOIN back through the relay (the relay server fans out
+ * every host-sent message to all students currently in the room).
  * @param {string} studentId
  * @param {string} [avatar]
  * @param {string} [avatarImage] - optional base64 data URL uploaded by the
  *   student; when present, rendering prefers it over the preset `avatar`.
  */
-function registerRealStudent(conn, studentId, avatar, avatarImage) {
+function registerRealStudent(studentId, avatar, avatarImage) {
   const alreadyRegistered = gameState.students.some((student) => student.id === studentId);
   if (!alreadyRegistered) {
     gameState.students.push({
@@ -1378,33 +1388,27 @@ function registerRealStudent(conn, studentId, avatar, avatarImage) {
     });
   }
 
-  const alreadyTracked = gameState.connections.some((entry) => entry.conn === conn);
-  if (!alreadyTracked) {
-    gameState.connections.push({ conn, studentId });
-  }
-
-  if (conn.open) {
-    conn.send({ type: MSG_TYPES.JOIN_ACK, payload: { studentId, status: 'ok' } });
-  } else {
-    conn.on('open', () => conn.send({ type: MSG_TYPES.JOIN_ACK, payload: { studentId, status: 'ok' } }));
-  }
+  broadcastToStudents({ type: MSG_TYPES.JOIN_ACK, payload: { studentId, status: 'ok' } });
 
   renderRoster();
 }
 
 /**
- * Sends a message to every connected (open) student DataConnection.
+ * Sends a message to the relay server over the host's single WebSocket; the
+ * relay server fans it out to every student socket currently in the room.
  * @param {{type: string, payload: object}} message
  */
 function broadcastToStudents(message) {
-  gameState.connections.forEach(({ conn }) => {
-    if (conn.open) conn.send(message);
-  });
+  if (!gameState.hostSocket || gameState.hostSocket.readyState !== WebSocket.OPEN) return;
+  gameState.hostSocket.send(JSON.stringify(message));
 }
 
 /**
- * Initializes the student's PeerJS Peer and connects to the host's Room ID,
- * sending a JOIN message once the connection is open.
+ * Opens the student's WebSocket connection to the relay server, sends a
+ * HELLO control frame for the given Room ID, and — once the relay confirms
+ * with HELLO_ACK — sends the existing JOIN message. On an ERROR reply (e.g.
+ * ROOM_NOT_FOUND), surfaces the same "connection failed" status the app has
+ * always shown for an invalid Room ID.
  * @param {string} roomId
  * @param {string} studentId
  * @param {string} avatar
@@ -1413,33 +1417,39 @@ function broadcastToStudents(message) {
  *   present.
  */
 function joinRoom(roomId, studentId, avatar, avatarImage) {
-  if (typeof Peer === 'undefined') {
-    setControllerStatus('PeerJS unavailable');
-    return;
-  }
-
   gameState.studentId = studentId;
-  const peer = new Peer(PEER_OPTIONS);
-  gameState.studentPeer = peer;
+  const socket = new WebSocket(RELAY_URL);
+  gameState.relaySocket = socket;
 
-  peer.on('open', () => {
-    const conn = peer.connect(roomId, { reliable: true });
-    gameState.hostConnection = conn;
-
-    conn.on('open', () => {
-      conn.send({ type: MSG_TYPES.JOIN, payload: { studentId, avatar, avatarImage } });
-    });
-
-    conn.on('data', (data) => handleClientMessage(data));
-
-    conn.on('error', (err) => {
-      console.error('PeerJS connection error:', err);
-      setControllerStatus(`Student: ${studentId} (connection failed)`);
-    });
+  socket.addEventListener('open', () => {
+    socket.send(JSON.stringify({ type: CONTROL_TYPES.HELLO, payload: { role: 'student', roomId } }));
   });
 
-  peer.on('error', (err) => {
-    console.error('PeerJS student error:', err);
+  socket.addEventListener('message', (event) => {
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch (err) {
+      return;
+    }
+    if (!message || typeof message.type !== 'string') return;
+
+    if (message.type === CONTROL_TYPES.HELLO_ACK) {
+      socket.send(JSON.stringify({ type: MSG_TYPES.JOIN, payload: { studentId, avatar, avatarImage } }));
+      return;
+    }
+
+    if (message.type === CONTROL_TYPES.ERROR) {
+      console.error('Relay student error:', message.payload && message.payload.code);
+      setControllerStatus(`Student: ${studentId} (connection failed)`);
+      return;
+    }
+
+    handleClientMessage(message);
+  });
+
+  socket.addEventListener('error', (err) => {
+    console.error('Relay student socket error:', err);
     setControllerStatus(`Student: ${studentId} (connection failed)`);
   });
 }
@@ -1567,12 +1577,12 @@ function initControllerOptions() {
   document.querySelectorAll('.controller-option').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (gameState.controllerHasSubmitted) return;
-      if (!gameState.hostConnection || !gameState.hostConnection.open) return;
+      if (!gameState.relaySocket || gameState.relaySocket.readyState !== WebSocket.OPEN) return;
 
       const choice = btn.dataset.choice;
       const timeElapsedMs = Date.now() - (gameState.controllerQuestionStartedAt || Date.now());
 
-      gameState.hostConnection.send({
+      gameState.relaySocket.send(JSON.stringify({
         type: MSG_TYPES.SUBMIT,
         payload: {
           questionId: gameState.controllerCurrentQuestionId,
@@ -1580,7 +1590,7 @@ function initControllerOptions() {
           choice,
           timeElapsedMs,
         },
-      });
+      }));
 
       gameState.controllerHasSubmitted = true;
       setControllerOptionsEnabled(false);
