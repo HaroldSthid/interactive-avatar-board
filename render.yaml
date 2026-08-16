@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: avatar-board-relay
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    # Render auto-populates RENDER_EXTERNAL_URL for every web service; no
+    # manual env var is needed here. The relay's self-ping (server/src/index.js)
+    # reads it directly from process.env.

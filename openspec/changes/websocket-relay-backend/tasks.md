@@ -27,22 +27,22 @@ Rationale: this change has two independently reviewable halves — a brand-new `
 
 ## Phase 2: Server Scaffold (PR 2)
 
-- [ ] Task 3: Create `server/package.json` — `{"type":"module"}`, dependency `ws`, `"start": "node src/index.js"`, `engines.node >= 20`.
+- [x] Task 3: Create `server/package.json` — `{"type":"module"}`, dependency `ws`, `"start": "node src/index.js"`, `engines.node >= 20`.
   - Satisfies: `design.md` §4 File Changes
   - Depends on: nothing (can start in parallel with Phase 1)
   - Parallelizable: yes
 
-- [ ] Task 4: Create `server/src/index.js` — `http.createServer` serving `GET /health` → 200, `new WebSocketServer({server})`, binds `process.env.PORT`, wires the self-ping interval (`fetch(RENDER_EXTERNAL_URL + '/health')` every 10 min, skipped when `RENDER_EXTERNAL_URL` is absent) and starts the 30s liveness sweep from `rooms.js`.
+- [x] Task 4: Create `server/src/index.js` — `http.createServer` serving `GET /health` → 200, `new WebSocketServer({server})`, binds `process.env.PORT`, wires the self-ping interval (`fetch(RENDER_EXTERNAL_URL + '/health')` every 10 min, skipped when `RENDER_EXTERNAL_URL` is absent) and starts the 30s liveness sweep from `rooms.js`.
   - Satisfies: `specs/relay-server/spec.md` — Cold-Start Self-Ping
   - Depends on: Task 3
   - Parallelizable: no
 
-- [ ] Task 5: Create `render.yaml` — `type: web`, `rootDir: server`, `buildCommand: npm install`, `startCommand: npm start`, free plan.
+- [x] Task 5: Create `render.yaml` — `type: web`, `rootDir: server`, `buildCommand: npm install`, `startCommand: npm start`, free plan.
   - Satisfies: `proposal.md` Affected Areas (`server/` deployment)
   - Depends on: Task 3
   - Parallelizable: yes (independent of Task 4)
 
-- [ ] Task 6: Create `server/README.md` — local dev steps (`npm start`, default port) and Render deploy steps (service creation, env vars, `RENDER_EXTERNAL_URL`).
+- [x] Task 6: Create `server/README.md` — local dev steps (`npm start`, default port) and Render deploy steps (service creation, env vars, `RENDER_EXTERNAL_URL`).
   - Satisfies: `proposal.md` Affected Areas (deployment documentation)
   - Depends on: Task 4, Task 5
   - Parallelizable: no
