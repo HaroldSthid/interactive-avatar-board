@@ -1,11 +1,7 @@
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
-
-// PR 3 (Task 7/8/9) will introduce ./rooms.js and ./relay.js:
-//   - rooms.js: the in-memory room registry (createRoom/joinRoom/dropSocket/sweepIdle)
-//   - relay.js: the HELLO/JOIN dispatcher and message routing (host<->students)
-// This scaffold wires the HTTP + WebSocket transport, the health endpoint, and
-// the cold-start self-ping. Connection/message handling is stubbed until PR 3.
+import { handleConnection } from './relay.js';
+import { dropSocket, sweepIdle } from './rooms.js';
 
 const PORT = process.env.PORT || 8080;
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
@@ -32,16 +28,7 @@ wss.on('connection', (socket) => {
     socket.isAlive = true;
   });
 
-  // TODO(PR 3 / Task 8): dispatch through relay.js — HELLO registers
-  // role+roomId via rooms.js and replies HELLO_ACK/ERROR; any other frame is
-  // unicast to the room's host or broadcast to the room's students.
-  socket.on('message', (_data) => {
-    // Stub: no room registry or relay logic yet.
-  });
-
-  socket.on('close', () => {
-    // TODO(PR 3 / Task 7): call rooms.dropSocket(socket) once the registry exists.
-  });
+  handleConnection(socket);
 });
 
 // Cold-Start Self-Ping: keep the Render free-tier instance warm.
@@ -54,18 +41,22 @@ if (RENDER_EXTERNAL_URL) {
   }, SELF_PING_INTERVAL_MS);
 }
 
-// 30s ping/pong liveness sweep (standard `ws` isAlive pattern).
-// TODO(PR 3 / Task 9): on terminate, also call rooms.dropSocket(socket) so a
-// dead host's room is freed and its students are dropped with code 4001.
+// 30s ping/pong liveness sweep (standard `ws` isAlive pattern). A socket that
+// missed the previous pong is terminated and dropped from the room registry
+// (frees a dead host's room + closes its students with code 4001, or removes
+// a dead student from its room). Also runs the 2h idle-room cap sweep.
 setInterval(() => {
   for (const socket of wss.clients) {
     if (socket.isAlive === false) {
       socket.terminate();
+      dropSocket(socket);
       continue;
     }
     socket.isAlive = false;
     socket.ping();
   }
+
+  sweepIdle();
 }, LIVENESS_SWEEP_INTERVAL_MS);
 
 server.listen(PORT, () => {

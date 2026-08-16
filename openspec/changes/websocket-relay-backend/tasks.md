@@ -51,22 +51,22 @@ Rationale: this change has two independently reviewable halves — a brand-new `
 
 ## Phase 3: Server Room Registry & Relay Logic (PR 3)
 
-- [ ] Task 7: Create `server/src/rooms.js` — `Map<roomId, {hostSocket, students: Map<socket,true>, lastSeenAt}>` with `createRoom(roomId, hostSocket)` (rejects if `roomId` already taken), `joinRoom(roomId, studentSocket)` (rejects if room doesn't exist), `dropSocket(socket)` (removes a student, or deletes the room + closes all students with code `4001` if it was the host), and `sweepIdle()` (drops rooms with no frame in 2h).
+- [x] Task 7: Create `server/src/rooms.js` — `Map<roomId, {hostSocket, students: Map<socket,true>, lastSeenAt}>` with `createRoom(roomId, hostSocket)` (rejects if `roomId` already taken), `joinRoom(roomId, studentSocket)` (rejects if room doesn't exist), `dropSocket(socket)` (removes a student, or deletes the room + closes all students with code `4001` if it was the host), and `sweepIdle()` (drops rooms with no frame in 2h).
   - Satisfies: `specs/relay-server/spec.md` — Room Registration, In-Memory-Only State; `design.md` decisions #3 (host disconnect), #4 (room GC)
   - Depends on: Task 4
   - Parallelizable: no
 
-- [ ] Task 8: Create `server/src/relay.js` — `on('connection')` handler; dispatcher on `on('message')`: a `HELLO` frame registers role+room via `rooms.js` and replies `HELLO_ACK` or `ERROR` (`ROOM_TAKEN` / `ROOM_NOT_FOUND` / `BAD_HELLO`); any other frame is unicast to the room's host (if sender is a student) or broadcast to the room's students (if sender is the host), payload passed through unmodified — the dispatcher only ever reads `.type`, never validates game-plane shape.
+- [x] Task 8: Create `server/src/relay.js` — `on('connection')` handler; dispatcher on `on('message')`: a `HELLO` frame registers role+room via `rooms.js` and replies `HELLO_ACK` or `ERROR` (`ROOM_TAKEN` / `ROOM_NOT_FOUND` / `BAD_HELLO`); any other frame is unicast to the room's host (if sender is a student) or broadcast to the room's students (if sender is the host), payload passed through unmodified — the dispatcher only ever reads `.type`, never validates game-plane shape.
   - Satisfies: `specs/relay-server/spec.md` — Student Room Join (post-Task-1 wording), Message Relay Routing; `design.md` §5 Interfaces/Contracts (control plane)
   - Depends on: Task 7, Task 1 (implements the corrected HELLO/JOIN flow)
   - Parallelizable: no
 
-- [ ] Task 9: Wire the 30s `ping`/`pong` `isAlive` liveness sweep into `server/src/index.js` (or `rooms.js`, whichever owns the socket set) per the standard `ws` heartbeat pattern, terminating dead sockets and triggering `dropSocket`.
+- [x] Task 9: Wire the 30s `ping`/`pong` `isAlive` liveness sweep into `server/src/index.js` (or `rooms.js`, whichever owns the socket set) per the standard `ws` heartbeat pattern, terminating dead sockets and triggering `dropSocket`.
   - Satisfies: `design.md` decision #4 (Room GC — liveness sweep)
   - Depends on: Task 7, Task 8
   - Parallelizable: no
 
-- [ ] Task 10: Manual verification — run `node server/src/index.js` locally, confirm `/health` returns 200, and drive `rooms.js` behavior from a scratch script or two WS client tabs: duplicate host Room ID rejected, join-unknown-room rejected, host drop deletes the room and closes students with `4001`.
+- [x] Task 10: Manual verification — run `node server/src/index.js` locally, confirm `/health` returns 200, and drive `rooms.js` behavior from a scratch script or two WS client tabs: duplicate host Room ID rejected, join-unknown-room rejected, host drop deletes the room and closes students with `4001`.
   - Satisfies: `design.md` §6 Testing Strategy — Server unit layer
   - Depends on: Task 8, Task 9
   - Parallelizable: no
