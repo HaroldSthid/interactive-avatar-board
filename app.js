@@ -1452,6 +1452,21 @@ function joinRoom(roomId, studentId, avatar, avatarImage) {
     console.error('Relay student socket error:', err);
     setControllerStatus(`Student: ${studentId} (connection failed)`);
   });
+
+  // The relay closes every student socket in a room with this code (see
+  // server/src/rooms.js's HOST_DISCONNECT_CODE) when its host disconnects —
+  // without this, a student's screen is left showing a stale question with
+  // no indication the session is dead. A generic close (network drop,
+  // student navigating away) is already covered by the 'error' listener
+  // above and shouldn't be relabeled as a host disconnect.
+  const HOST_DISCONNECT_CODE = 4001;
+  socket.addEventListener('close', (event) => {
+    if (event.code !== HOST_DISCONNECT_CODE) return;
+    setControllerStatus(`Student: ${studentId} (host disconnected)`);
+    setControllerQuestionText('Host disconnected. Ask your teacher to restart the session.');
+    setControllerOptionsEnabled(false);
+    gameState.controllerCountdownStop?.();
+  });
 }
 
 /**
