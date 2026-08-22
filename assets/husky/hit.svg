@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Husky hit by obstacle">
+  <!-- placeholder art as SVG -- swap for real PNG sprites without touching code, see design.md -->
+  <polygon points="8,34 1,30 9,40" fill="#cbcbd6" stroke="#ff3860" stroke-width="2" stroke-linejoin="round"/>
+  <ellipse cx="30" cy="36" rx="20" ry="12" fill="#cbcbd6" stroke="#ff3860" stroke-width="2"/>
+  <rect x="48" y="46" width="6" height="10" rx="2" fill="#cbcbd6" stroke="#ff3860" stroke-width="2"/>
+  <rect x="12" y="46" width="6" height="10" rx="2" fill="#cbcbd6" stroke="#ff3860" stroke-width="2"/>
+  <circle cx="48" cy="26" r="10" fill="#ffffff" stroke="#ff3860" stroke-width="2"/>
+  <polygon points="42,18 46,6 50,17" fill="#cbcbd6" stroke="#ff3860" stroke-width="2" stroke-linejoin="round"/>
+  <polygon points="50,17 54,6 57,18" fill="#cbcbd6" stroke="#ff3860" stroke-width="2" stroke-linejoin="round"/>
+  <line x1="50" y1="24" x2="54" y2="28" stroke="#ff3860" stroke-width="1.6"/>
+  <line x1="54" y1="24" x2="50" y2="28" stroke="#ff3860" stroke-width="1.6"/>
+</svg>

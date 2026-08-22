@@ -77,30 +77,32 @@ Rationale: per `design.md` "Honest sizing" — this is the largest net-new piece
 
 ## Phase 2: Canvas Rendering + Sprite Assets (PR 2)
 
-- [ ] 2.1 Create `assets/husky/run-1.png`, `run-2.png`, `jump.png`, `hit.png` — 64×64 transparent PNG, flat two-tone silhouette placeholder in the existing preset-avatar pixel-art register.
+- [x] 2.1 Create `assets/husky/run-1.png`, `run-2.png`, `jump.png`, `hit.png` — 64×64 transparent PNG, flat two-tone silhouette placeholder in the existing preset-avatar pixel-art register.
   - Satisfies: `design.md` §4 Sprite Plan
   - Depends on: nothing
   - Parallelizable: yes
+  - **Deviation**: no raster/bitmap image-generation capability was available. Shipped as `assets/husky/{run-1,run-2,jump,hit}.svg` instead — same 64×64 logical size, same preload/`.decode()` gate architecture (SVG decodes via `HTMLImageElement` exactly like PNG). Swapping in real PNG art later is a one-line `SPRITE_FILES` extension change, no other code edit. See file-header comment in `bonus-round.js`.
 
-- [ ] 2.2 Add sprite preload in `bonus-round.js`: load the 4 images into `Image[]`, gate `start()` on all `.decode()` promises resolving.
+- [x] 2.2 Add sprite preload in `bonus-round.js`: load the 4 images into `Image[]`, gate `start()` on all `.decode()` promises resolving.
   - Satisfies: `design.md` §2 Decision 4 (sprite delivery)
   - Depends on: 1.6, 2.1
   - Parallelizable: no
 
-- [ ] 2.3 Implement husky sprite draw: airborne → `jump.png`, grounded → `run[floor(distance/RUN_FRAME_PX)%2]`, `hit.png` + final-score overlay on the death frame.
+- [x] 2.3 Implement husky sprite draw: airborne → `jump.png`, grounded → `run[floor(distance/RUN_FRAME_PX)%2]`, `hit.png` + final-score overlay on the death frame.
   - Satisfies: `design.md` §3 Game Loop (draw block); §8 Testing Strategy — Collision correctness (visual)
   - Depends on: 2.2
   - Parallelizable: no
 
-- [ ] 2.4 Implement procedural ground (scrolling dashed line) and procedural obstacle rendering (neon rects) using palette constants — no assets for these.
+- [x] 2.4 Implement procedural ground (scrolling dashed line) and procedural obstacle rendering (neon rects) using palette constants — no assets for these.
   - Satisfies: `design.md` §4 Sprite Plan (ground/obstacles drawn procedurally)
   - Depends on: 2.3
   - Parallelizable: no
 
-- [ ] 2.5 Manual verification: confirm sprites decode before round start, frame swap alternates visually during a run, `hit.png` shows on collision.
+- [x] 2.5 Manual verification: confirm sprites decode before round start, frame swap alternates visually during a run, `hit.png` shows on collision.
   - Satisfies: `design.md` §8 Testing Strategy — Engine layer (visual)
   - Depends on: 2.4
   - Parallelizable: no
+  - **Verification method**: no browser/headless-browser tool (puppeteer/playwright) available in this environment, so a real visual render wasn't possible. Verified via a Node script mocking `Image`/canvas 2D context/`requestAnimationFrame` and driving `start()`/`frame()`/`draw()` end-to-end: confirmed `phase` stays `'loading'` until the 4 `.decode()` promises resolve then flips to `'running'`; confirmed `clearRect` fires every frame before redraw (no trail accumulation); confirmed `run-1.svg`/`run-2.svg` both appear (frame-swap alternation) during a grounded run; confirmed airborne state selects `jump.svg` and the death frame selects `hit.svg` plus a score-overlay `fillRect`+`fillText`; confirmed headless `start()` (no canvas) still runs the physics loop unchanged from PR 1 (`draw()` no-ops without `ctx`). A throwaway `<canvas>` HTML page (per this task's own instruction) was also written and deleted, but could not be opened/inspected visually in this environment — flagging that gap explicitly rather than claiming a visual check that didn't happen.
 
 ---
 

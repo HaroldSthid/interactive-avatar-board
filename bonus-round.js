@@ -3,13 +3,24 @@
 /**
  * Interactive Avatar Board — bonus-round.js
  *
- * Husky Bonus Round: headless endless-runner engine.
+ * Husky Bonus Round: headless endless-runner engine + canvas rendering.
  *
- * PR 1 (this file, current state): physics, difficulty ramp, obstacle
- * spawning, AABB collision, and the public start/stop surface. Deliberately
- * has zero canvas-drawing, zero sprite-loading, and zero socket/DOM (outside
- * an optional click listener on the passed-in canvas) knowledge — those
- * arrive in later PRs (see openspec/changes/husky-bonus-round/tasks.md).
+ * PR 1: physics, difficulty ramp, obstacle spawning, AABB collision, and the
+ * public start/stop surface.
+ * PR 2 (this file, current state): sprite preload/decode gate and canvas
+ * drawing (husky sprite frame-swap, procedural ground/obstacles). Still zero
+ * socket/DOM (outside an optional click listener on the passed-in canvas)
+ * knowledge — that arrives in PR 3 (see
+ * openspec/changes/husky-bonus-round/tasks.md).
+ *
+ * Sprite note: design.md §4 Sprite Plan specifies 4 PNGs. This build ships
+ * placeholder art as SVG instead (no raster/bitmap image-generation
+ * capability was available while implementing PR 2) — `HTMLImageElement`
+ * loads and `drawImage()`s SVGs into canvas exactly like PNGs, and
+ * `.decode()` works on them too, so the preload/decode-gate architecture
+ * below is unchanged. Swapping in real PNG art later is a file swap only
+ * (same dimensions, update `SPRITE_FILES` extensions) — no code edit needed
+ * beyond that one constant. See design.md §4 and §10 Open Questions.
  *
  * Public surface (per design.md §1 Technical Approach):
  *   window.BonusRound.start({ canvas, onScore, onEnd })
@@ -77,6 +88,42 @@ const MAX_DT = 0.05;
 // Score-report throttle — design.md §3 Game Loop / §5 Protocol Schema.
 // The engine itself throttles onScore(); app.js (PR 3) just forwards it.
 const SCORE_REPORT_INTERVAL = 0.3;
+
+// ---------------------------------------------------------------------------
+// Sprite plan (design.md §4) — see file header for the PNG-to-SVG placeholder
+// substitution note.
+// ---------------------------------------------------------------------------
+
+const SPRITE_DIR = 'assets/husky/';
+const SPRITE_FILES = {
+  run1: 'run-1.svg',
+  run2: 'run-2.svg',
+  jump: 'jump.svg',
+  hit: 'hit.svg',
+};
+
+// Distance (world px) travelled per run-frame swap — NOT specified by
+// design.md, only the alternation rule (`run[floor(distance/RUN_FRAME_PX)%2]`,
+// tasks.md 2.3). Chosen so the leg cycle reads as running rather than
+// flickering at BASE_SPEED, and naturally quickens as speed ramps up since
+// distance accrues faster per real second.
+const RUN_FRAME_PX = 40;
+
+// ---------------------------------------------------------------------------
+// Canvas palette — mirrors the neon custom properties in style.css (:root).
+// Duplicated here because canvas 2D fill/stroke styles can't read CSS custom
+// properties; keep in sync with style.css by hand if that palette changes.
+// ---------------------------------------------------------------------------
+
+const COLOR_BG = '#0a0a14';
+const COLOR_NEON_CYAN = '#00f0ff';
+const COLOR_NEON_MAGENTA = '#ff00c8';
+const COLOR_TEXT = '#e6e6f0';
+
+// Procedural scrolling-ground dash pattern — NOT specified by design.md
+// beyond "scrolling dashed line" (design.md §3 Game Loop draw block).
+const GROUND_DASH_LENGTH = 14;
+const GROUND_DASH_GAP = 10;
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -219,6 +266,130 @@ function stepBonusRound(state, dt) {
 }
 
 // ---------------------------------------------------------------------------
+// Sprite preload (design.md §2 Decision 4; tasks.md 2.2)
+// ---------------------------------------------------------------------------
+
+// Module-level so sprites load once and are reused across rounds (repeated
+// `start()` calls on the same device, e.g. host restarting a stuck run).
+let spriteImages = null; // { run1, run2, jump, hit } HTMLImageElement, once loaded
+let spritesReadyPromise = null;
+
+/**
+ * Creates the 4 sprite `Image`s and returns a promise that resolves once
+ * every one has decoded (or failed to — a broken/missing sprite must not
+ * hang the round forever, so decode failures are tolerated and fall back to
+ * the flat-rect placeholder in `drawHusky`).
+ * No-ops (resolves with `null`) outside a DOM (headless/Node manual test).
+ */
+function loadSprites() {
+  if (spritesReadyPromise) return spritesReadyPromise;
+  if (typeof Image === 'undefined') {
+    spritesReadyPromise = Promise.resolve(null);
+    return spritesReadyPromise;
+  }
+
+  const images = {};
+  const decodePromises = Object.keys(SPRITE_FILES).map((key) => {
+    const img = new Image();
+    img.src = SPRITE_DIR + SPRITE_FILES[key];
+    images[key] = img;
+    if (typeof img.decode === 'function') {
+      // decode() rejects on load failure — tolerated, see doc comment above.
+      return img.decode().catch(() => {});
+    }
+    // Fallback for environments without decode(): resolve on load/error.
+    return new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+  });
+
+  spriteImages = images;
+  spritesReadyPromise = Promise.all(decodePromises).then(() => images);
+  return spritesReadyPromise;
+}
+
+// ---------------------------------------------------------------------------
+// Draw (design.md §3 Game Loop draw block; tasks.md 2.3, 2.4)
+// ---------------------------------------------------------------------------
+
+function huskySprite(state) {
+  if (!spriteImages) return null;
+  if (state.phase === 'dead') return spriteImages.hit;
+  if (!state.grounded) return spriteImages.jump;
+  const frameIndex = Math.floor(state.distance / RUN_FRAME_PX) % 2;
+  return frameIndex === 0 ? spriteImages.run1 : spriteImages.run2;
+}
+
+function drawGround(ctx, distance) {
+  const period = GROUND_DASH_LENGTH + GROUND_DASH_GAP;
+  const offset = distance % period;
+  ctx.strokeStyle = COLOR_NEON_CYAN;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = -offset; x < WORLD_WIDTH; x += period) {
+    ctx.moveTo(x, GROUND_Y);
+    ctx.lineTo(x + GROUND_DASH_LENGTH, GROUND_Y);
+  }
+  ctx.stroke();
+}
+
+function drawObstacles(ctx, obstacles) {
+  ctx.save();
+  ctx.fillStyle = COLOR_NEON_MAGENTA;
+  ctx.shadowColor = COLOR_NEON_MAGENTA;
+  ctx.shadowBlur = 6;
+  for (const obstacle of obstacles) {
+    ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+  }
+  ctx.restore();
+}
+
+function drawHusky(ctx, state) {
+  const sprite = huskySprite(state);
+  const box = huskyBox(state);
+  // `complete && naturalWidth > 0` guards against drawing a sprite that
+  // errored (decode() tolerated the failure above but left a broken image).
+  if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+    ctx.drawImage(sprite, box.x, box.y, box.width, box.height);
+  } else {
+    // Fallback while sprites are still loading (shouldn't normally be
+    // visible — start() gates on the decode promise) or if one failed to
+    // load: a flat rect keeps the run visibly alive instead of blank.
+    ctx.fillStyle = state.phase === 'dead' ? COLOR_NEON_MAGENTA : COLOR_NEON_CYAN;
+    ctx.fillRect(box.x, box.y, box.width, box.height);
+  }
+}
+
+function drawFinalScoreOverlay(ctx, score) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(10, 10, 20, 0.55)';
+  ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  ctx.fillStyle = COLOR_TEXT;
+  ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`Score: ${score}`, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+  ctx.restore();
+}
+
+/**
+ * Clears and redraws the full frame. No-op when `state.ctx` is absent
+ * (headless run — preserves PR 1's DOM-free testability, tasks.md 1.8).
+ */
+function draw(state) {
+  const ctx = state.ctx;
+  if (!ctx) return;
+  ctx.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  ctx.fillStyle = COLOR_BG;
+  ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  drawGround(ctx, state.distance);
+  drawObstacles(ctx, state.obstacles);
+  drawHusky(ctx, state);
+  if (state.phase === 'dead') drawFinalScoreOverlay(ctx, state.score);
+}
+
+// ---------------------------------------------------------------------------
 // rAF loop + public interface
 // ---------------------------------------------------------------------------
 
@@ -226,6 +397,7 @@ function frame(state, now) {
   const dt = Math.min((now - state.last) / 1000, MAX_DT);
   state.last = now;
   stepBonusRound(state, dt);
+  draw(state);
   if (state.phase === 'running') {
     state.rafId = requestAnimationFrame((nextNow) => frame(state, nextNow));
   }
@@ -300,6 +472,13 @@ let activeBonusRoundState = null;
 /**
  * Begins a new run. Cancels any previously active run first (defensive —
  * app.js, PR 3, is expected to call stop() before a new start()).
+ *
+ * Round start is gated on sprite decode (design.md §2 Decision 4; tasks.md
+ * 2.2) whenever a drawable canvas was supplied: `state.phase` stays
+ * `'loading'` — input handlers are attached but `jump()`/collision are
+ * no-ops outside `'running'` — until all 4 sprites resolve, then the rAF
+ * loop begins. Headless calls (no canvas, e.g. the manual-verification
+ * script from tasks.md 1.8) skip the gate entirely and start immediately.
  * @param {{canvas?: HTMLCanvasElement, onScore?: (score:number)=>void, onEnd?: (score:number)=>void}} options
  */
 function start(options) {
@@ -309,13 +488,21 @@ function start(options) {
   const state = createBonusRoundState();
   state.onScore = onScore;
   state.onEnd = onEnd;
-  state.phase = 'running';
+  state.phase = 'loading';
   initCanvas(state, canvas);
   attachInputHandlers(state);
-  state.last = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  state.rafId = requestAnimationFrame((now) => frame(state, now));
-
   activeBonusRoundState = state;
+
+  const readyPromise = state.ctx ? loadSprites() : Promise.resolve(null);
+  readyPromise.then(() => {
+    // A stop() (or a superseding start()) may have run while sprites were
+    // still decoding — don't resurrect a stale, already-discarded state.
+    if (activeBonusRoundState !== state) return;
+    state.phase = 'running';
+    state.last = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    state.rafId = requestAnimationFrame((now) => frame(state, now));
+  });
+
   return state;
 }
 
@@ -345,6 +532,10 @@ const bonusRoundTestApi = Object.assign({}, bonusRoundPublicApi, {
     spawnObstacle,
     jump,
     die,
+    loadSprites,
+    huskySprite,
+    draw,
+    getSpriteImages: () => spriteImages,
     constants: {
       WORLD_WIDTH,
       WORLD_HEIGHT,
@@ -362,6 +553,9 @@ const bonusRoundTestApi = Object.assign({}, bonusRoundPublicApi, {
       MAX_GAP_SECONDS,
       MAX_DT,
       SCORE_REPORT_INTERVAL,
+      SPRITE_DIR,
+      SPRITE_FILES,
+      RUN_FRAME_PX,
     },
   },
 });
