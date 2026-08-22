@@ -671,6 +671,31 @@ button {
   transform: scale(0.97);
 }
 
+/* Husky Bonus Round (PR 5): the canvas swaps in for #controller-grid on the
+   finalist's own phone (app.js's BONUS_START handler toggles [hidden] on
+   both). Fixed 480x160 logical world (bonus-round.js), scaled here to the
+   phone's viewport width; the element's actual backing-store pixel size is
+   set by bonus-round.js's initCanvas() using devicePixelRatio, so this block
+   only controls the *display* size, never width/height attributes. */
+.controller-bonus {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-md) 0;
+}
+
+.controller-bonus__canvas {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 480 / 160;
+  background: var(--color-bg-panel-alt);
+  border: 1px solid var(--color-neon-magenta);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-neon-magenta);
+  /* Tap-to-jump must fire immediately — no double-tap-to-zoom delay on mobile
+     browsers (design.md §2 Decision 7, click input). */
+  touch-action: manipulation;
+}
+
 /* ==========================================================================
    Phase 4: Cyberpunk polish — glow effects, dynamic active states,
    and avatar hover tooltips

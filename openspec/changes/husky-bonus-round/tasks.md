@@ -214,30 +214,32 @@ Rationale: per `design.md` "Honest sizing" — this is the largest net-new piece
 
 ## Phase 5: Spectator Screen + Canvas Wiring (PR 5)
 
-- [ ] 5.1 Add `<script src="bonus-round.js">` to `index.html`, before the `app.js` script tag.
+- [x] 5.1 Add `<script src="bonus-round.js">` to `index.html`, before the `app.js` script tag.
   - Satisfies: `design.md` §7 File Changes (index.html:160)
   - Depends on: 1.6
   - Parallelizable: yes
 
-- [ ] 5.2 Add `#controller-bonus` wrapper with `<canvas id="bonus-canvas">` to `index.html` controller view, hidden by default.
+- [x] 5.2 Add `#controller-bonus` wrapper with `<canvas id="bonus-canvas">` to `index.html` controller view, hidden by default.
   - Satisfies: `design.md` §7 File Changes (controller view)
   - Depends on: 5.1
   - Parallelizable: no
 
-- [ ] 5.3 Wire spectator text via existing `setControllerQuestionText()`: bonus-in-progress message for non-finalists on `BONUS_START`, champion line on `BONUS_END`. No new markup.
+- [x] 5.3 Wire spectator text via existing `setControllerQuestionText()`: bonus-in-progress message for non-finalists on `BONUS_START`, champion line on `BONUS_END`. No new markup.
   - Satisfies: `specs/bonus-round/spec.md` — Spectator Screen
   - Depends on: 3.11, 5.2
   - Parallelizable: no
+  - **Note**: the non-finalist spectator message on `BONUS_START` was already wired in PR 3 (`app.js`'s `handleClientMessage`). This PR adds the missing half: a `buildBonusResultsText()` helper (mirrors `buildFinalResultsText()`'s pattern) called from the `BONUS_END` case for both players and spectators. Also added the `#controller-grid`/`#controller-bonus` visibility toggle for finalists in the `BONUS_START` handler — not pure markup, but required so the now-real canvas is actually usable instead of sitting `hidden` forever; scoped to the player branch only, since spectators never touch the canvas.
 
-- [ ] 5.4 Add `style.css` rules for `#bonus-canvas` sizing/responsive scaling on the controller view.
+- [x] 5.4 Add `style.css` rules for `#bonus-canvas` sizing/responsive scaling on the controller view.
   - Satisfies: `design.md` §7 File Changes (style.css)
   - Depends on: 5.2
   - Parallelizable: yes
 
-- [ ] 5.5 Manual verification: non-finalist phone shows spectator text on `BONUS_START` and the champion line on `BONUS_END`, existing question-screen markup untouched.
+- [x] 5.5 Manual verification: non-finalist phone shows spectator text on `BONUS_START` and the champion line on `BONUS_END`, existing question-screen markup untouched.
   - Satisfies: `specs/bonus-round/spec.md` — Spectator Screen
   - Depends on: 5.3, 5.4
   - Parallelizable: no
+  - **Verification method**: no browser/device available in this environment (same constraint as PR 2/3/4). Verified via code inspection + `node --check` on `app.js` and `bonus-round.js` (both parse cleanly) and `rg` cross-checks confirming `bonus-canvas`/`controller-bonus`/`controller-grid` IDs match exactly between `app.js` and `index.html`, and that `<script src="bonus-round.js">` precedes `<script src="app.js">`. Traced the full flow by reading code, not by running it: host clicks "Iniciar Ronda Bonus" (PR 4 button) → `startBonusRound()` broadcasts `BONUS_START` → each client's `handleClientMessage` self-selects player/spectator by `finalists.includes(studentId)` → spectators get `setControllerQuestionText('Ronda bonus en curso...')` (unchanged from PR 3) → players get the same text plus `#controller-grid` hidden / `#controller-bonus` shown, then `window.BonusRound.start({canvas: getElementById('bonus-canvas'), ...})` (now resolves to a real element instead of `null`) → engine's `initCanvas()` sets backing-store size from `devicePixelRatio` and starts the rAF loop → `onScore` throttled every 300ms sends `BONUS_SCORE{alive:true}` → host's `handleHostMessage` updates `bonusScores`/`bonusLastSeen` and re-renders the PR-4 leaderboard → on collision, `onEnd` sends `BONUS_SCORE{alive:false}` immediately → `checkBonusRoundFinalization()` (all dead/stalled) or the 180s cap or the host's manual "Finalizar" button triggers `endBonusRound()` → `BONUS_END` broadcasts standings + champions → host shows `renderBonusChampionReveal()`, every client's `BONUS_END` case calls `window.BonusRound.stop()` (players only) and `setControllerQuestionText(buildBonusResultsText(...))`. **Still needs a real device/browser test**: actual canvas rendering/frame pacing, touch tap-to-jump latency, DPR scaling correctness on real phone screens, and the full multi-tab WebSocket flow — none of this can be exercised without a live browser, same gap flagged in every prior PR's manual-verification tasks (1.8, 2.5, 3.12, 4.6) and explicitly deferred to Phase 6.
 
 ---
 

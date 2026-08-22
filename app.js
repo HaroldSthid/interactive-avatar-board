@@ -1734,19 +1734,20 @@ function handleClientMessage(message) {
 
       setControllerQuestionText('Ronda bonus: ¡sos finalista! Tocá la pantalla para saltar.');
 
+      // Swap the quiz answer grid for the game canvas — index.html/style.css
+      // wiring, tasks.md 5.2/5.4. Both elements are optional-chained so this
+      // still no-ops gracefully if index.html hasn't landed them.
+      document.getElementById('controller-grid')?.setAttribute('hidden', '');
+      document.getElementById('controller-bonus')?.removeAttribute('hidden');
+
       if (!window.BonusRound || typeof window.BonusRound.start !== 'function') {
-        // bonus-round.js isn't wired into index.html yet — that <script> tag
-        // and the #bonus-canvas element land in PR 5 (tasks.md 5.1/5.2).
-        // Guarded rather than assumed so this file doesn't throw once PR 3
-        // ships ahead of it.
+        // Defensive guard: bonus-round.js failed to load or hasn't executed
+        // yet. Shouldn't happen once index.html wires the <script> tag
+        // (tasks.md 5.1), but this keeps handleClientMessage() from throwing.
         break;
       }
 
       window.BonusRound.start({
-        // PR 5 wires this element into index.html (#controller-bonus wrapper
-        // + <canvas id="bonus-canvas">, tasks.md 5.2). Until then this is
-        // null, which bonus-round.js already treats as a valid headless run
-        // (see bonus-round.js's initCanvas()).
         canvas: document.getElementById('bonus-canvas'),
         onScore: (score) => sendBonusScore(score, true),
         onEnd: (score) => sendBonusScore(score, false),
@@ -1760,6 +1761,10 @@ function handleClientMessage(message) {
       if (gameState.bonusRole === 'player' && window.BonusRound && typeof window.BonusRound.stop === 'function') {
         window.BonusRound.stop();
       }
+      // Champion line for everyone (players and spectators alike) — Spectator
+      // Screen spec, tasks.md 5.3. The canvas (if any) is left visible under
+      // this text so a finalist still sees their own death frame/score.
+      setControllerQuestionText(buildBonusResultsText(standings, champions));
       break;
     }
     default:
@@ -1817,6 +1822,32 @@ function buildFinalResultsText(finalRanking) {
     .join(' | ');
 
   return `Sesion terminada! Ganador: ${winner.studentId} con ${winner.score} pts. ${ownResultText} Top 3: ${top3}`;
+}
+
+/**
+ * Builds the champion-reveal text shown on the student/controller view once
+ * `BONUS_END` arrives — mirrors `buildFinalResultsText()`'s pattern (reuse
+ * `setControllerQuestionText()`, no dedicated results UI, per design.md §7
+ * "Spectator screen costs zero new markup"). Shown to finalists and
+ * spectators alike; a finalist also sees the champion line under their own
+ * death frame still drawn on `#bonus-canvas`.
+ * @param {Array<{studentId: string, score: number}>} standings - already
+ *   sorted descending by score (see endBonusRound())
+ * @param {Array<string>} champions - one entry, or several on a tie
+ * @returns {string}
+ */
+function buildBonusResultsText(standings, champions) {
+  if (!champions || champions.length === 0) {
+    return 'Ronda bonus terminada! No hubo puntajes registrados.';
+  }
+
+  const champLine =
+    champions.length > 1 ? `Co-Campeones: ${champions.join(' y ')}` : `Campeon: ${champions[0]}`;
+
+  const myEntry = (standings || []).find((entry) => entry.studentId === gameState.studentId);
+  const ownResultText = myEntry ? ` Tu puntaje: ${myEntry.score} pts.` : '';
+
+  return `Ronda bonus terminada! ${champLine}.${ownResultText}`;
 }
 
 function setControllerQuestionText(text) {

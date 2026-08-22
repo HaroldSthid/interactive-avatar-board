@@ -161,9 +161,20 @@
         <button type="button" class="controller-option" data-choice="C">C</button>
         <button type="button" class="controller-option" data-choice="D">D</button>
       </div>
+
+      <!-- Husky Bonus Round: shown/hidden by app.js in place of #controller-grid
+           for finalists only (BONUS_START handler in handleClientMessage()).
+           Non-finalists stay on #controller-question-text (spectator message,
+           tasks.md 5.3) and never see this canvas. Backing-store size and DPR
+           scaling are set by bonus-round.js's initCanvas() at start() time,
+           not here — see style.css for the responsive display size. -->
+      <div id="controller-bonus" class="controller-bonus" hidden>
+        <canvas id="bonus-canvas" class="controller-bonus__canvas"></canvas>
+      </div>
     </section>
   </div>
 
+  <script src="bonus-round.js"></script>
   <script src="questions-public.js"></script>
   <script src="app.js"></script>
 </body>
