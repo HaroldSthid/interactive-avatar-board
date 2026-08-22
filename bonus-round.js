@@ -40,17 +40,22 @@
 const WORLD_WIDTH = 480;
 const WORLD_HEIGHT = 160;
 
-// Difficulty ramp — explicit in design.md §3 / tasks.md 1.3:
-// speed = min(320 + 12*elapsed, 700) px/s.
-const BASE_SPEED = 320; // px/s at elapsed = 0
-const RAMP_PER_SECOND = 12; // px/s gained per second of elapsed run time
-const MAX_SPEED = 700; // px/s cap
+// Difficulty ramp — originally 320->700 px/s per design.md §3/tasks.md 1.3,
+// eased after real-device playtesting showed the reaction window (time from
+// an obstacle spawning at the world edge to reaching the husky) too short to
+// reliably time a jump. Slower start, gentler ramp, lower cap.
+const BASE_SPEED = 220; // px/s at elapsed = 0
+const RAMP_PER_SECOND = 8; // px/s gained per second of elapsed run time
+const MAX_SPEED = 560; // px/s cap
 
-// Husky vertical physics — NOT specified by design.md; chosen to produce a
-// ~0.47s hangtime and ~49px peak jump height, which clears the obstacle
-// sizes below with comfortable margin at both BASE_SPEED and MAX_SPEED.
-const GRAVITY = 1800; // px/s^2, downward (positive Y is down)
-const JUMP_VELOCITY = -420; // px/s, upward impulse applied on jump
+// Husky vertical physics — NOT specified by design.md; eased after real-
+// device playtesting (same pass as the speed constants above) — the
+// original ~49px peak left only ~5px of clearance over the tallest 44px
+// obstacle, which read as "couldn't time the jump" rather than a fair
+// challenge. These values produce a ~0.61s hangtime and ~70px peak, a much
+// wider timing window over the same obstacle sizes.
+const GRAVITY = 1500; // px/s^2, downward (positive Y is down)
+const JUMP_VELOCITY = -460; // px/s, upward impulse applied on jump
 
 // Husky visual bounds — NOT specified by design.md; sized relative to the
 // 480x160 world and the 64x64 source sprites (drawn scaled down in PR 2).
@@ -77,8 +82,8 @@ const OBSTACLE_MAX_HEIGHT = 44;
 // "gap in time, not px, so the ramp never makes a jump physically
 // impossible". A fixed pixel gap would shrink in reaction-time terms as
 // speed ramps up; this keeps the reaction window constant.
-const MIN_GAP_SECONDS = 1.0;
-const MAX_GAP_SECONDS = 1.8;
+const MIN_GAP_SECONDS = 1.3;
+const MAX_GAP_SECONDS = 2.2;
 
 // Frame-independence clamp — design.md Decision #2: 50ms max per step, so a
 // backgrounded-tab stall degrades to slow motion instead of a phantom
