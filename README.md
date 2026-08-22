@@ -34,6 +34,18 @@ Además del ranking de velocidad de cada ronda (que se muestra y se descarta en 
 
 Al clickear **"Finalizar sesión"**, el docente cierra la sesión y se muestra el **ranking final** (ordenado de mayor a menor puntaje acumulado, con el ganador destacado) tanto en el board del docente como en la pantalla de cada estudiante conectado. Los estudiantes que nunca sumaron puntos igual aparecen en el ranking (al final), para que el docente vea el panorama completo de la clase, no solo a los que puntuaron.
 
+## Ronda bonus: Husky Jump
+
+Al terminar el quiz, el docente puede lanzar una **ronda extra de habilidad** para los mejores puntajes — pensada como algo aparte de la velocidad para responder, más parecida a reflejos/timing.
+
+1. Con la sesión en estado "Finalizar sesión" (después del ranking final), aparece el botón **"Start Bonus Round"** en el board del docente.
+2. Clasifican los **3 mejores puntajes acumulados** del quiz — si hay empate en el 3er puesto, entran todos los empatados (puede terminar siendo "top 4" o más ese día, nadie queda afuera por un empate).
+3. Cada finalista juega en **su propio celular**, al mismo tiempo que los demás (no hace falta turnarse). El juego es tipo "el dinosaurio de Chrome sin internet", pero con un husky: tocá la pantalla para saltar y esquivar los conos de tránsito que van apareciendo. La dificultad sube gradualmente cuanto más dura la partida.
+4. El resto de la clase (los que no clasificaron) ve un mensaje simple avisando que hay una ronda bonus en curso — el resultado se sigue en el board del docente, que muestra el **puntaje de cada finalista actualizándose en vivo** mientras juegan.
+5. Cuando todos terminan (o se agota el tiempo, o el docente corta la ronda a mano con **"Finalizar ronda bonus"**), se anuncia un **campeón de habilidad** — separado del campeón del quiz, no modifica el ranking acumulado. Si hay empate en el puntaje más alto, se anuncian co-campeones.
+
+**Ojo con el arte del husky:** es una silueta simple dibujada en el canvas (no una ilustración detallada) — suficiente para reconocer al personaje corriendo/saltando, pero no busques un dibujo realista.
+
 ## Cómo editar el banco de preguntas
 
 Las preguntas están divididas en **dos archivos** que hay que editar juntos:
@@ -81,3 +93,5 @@ El juego arranca con **20 preguntas de ejemplo**. El orden es **aleatorio** (no 
 - Si un estudiante real se une **después** de activar el simulador, el simulador no genera estudiantes mock nuevos (no se mezclan automáticamente).
 - No hay manejo robusto de desconexión: si un estudiante pierde la conexión, su avatar no se limpia ni se marca automáticamente.
 - La separación entre `questions-public.js` y `answers.json` es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.
+- La ronda bonus (Husky Jump) es una feature nueva — probada con grupos chicos, todavía no con una clase completa jugándola en simultáneo. El arte del husky y los conos son formas simples dibujadas en canvas, no ilustraciones.
+- Los efectos de sonido de la ronda bonus (salto/choque) dependen de que el navegador permita reproducir audio — algunos navegadores mobile lo bloquean sin una interacción previa del usuario en esa página; si no se escucha nada, revisá que el celular no esté en silencio antes de asumir que es un bug.
