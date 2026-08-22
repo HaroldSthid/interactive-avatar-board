@@ -167,6 +167,12 @@ const GAME_STATES = {
   ACTIVE_QUESTION: 'ACTIVE_QUESTION',
   LEADERBOARD: 'LEADERBOARD',
   SESSION_END: 'SESSION_END',
+  // Husky Bonus Round (see openspec/changes/husky-bonus-round) — two flat
+  // states rather than one state + a sub-flag, per design.md Decision #6, so
+  // the existing `renderDashboard()`/panel-renderer idiom of gating purely
+  // on `gameState.current === X` keeps working unchanged.
+  BONUS_ROUND: 'BONUS_ROUND',
+  BONUS_RESULTS: 'BONUS_RESULTS',
 };
 
 const QUADRANTS = ['A', 'B', 'C', 'D'];
@@ -235,6 +241,21 @@ const gameState = {
   // --- Per-question countdown (timer bar + tick/alarm audio) ---
   hostCountdownStop: null, // host: stop() returned by startCountdown() for the board's timer
   controllerCountdownStop: null, // student: stop() returned by startCountdown() for the controller's timer
+
+  // --- Husky Bonus Round (Phase 3 — see openspec/changes/husky-bonus-round)
+  // Deliberately separate from finalRanking/totalScores/questionOrder above
+  // — "Independence from Quiz Scoring" (specs/bonus-round/spec.md) requires
+  // the bonus round to never read from or write back into quiz scoring
+  // state. Every field below is bonus-round-only. ---
+  bonusFinalists: [], // host: finalist studentIds, derived by deriveBonusFinalists()
+  bonusScores: {}, // host: studentId -> { score, alive, stalled }
+  bonusLastSeen: {}, // host: studentId -> Date.now() of the last BONUS_SCORE received (stall detection)
+  bonusStartedAt: null, // host: Date.now() when BONUS_START was broadcast (180s hard-cap reference)
+  bonusStandings: [], // host: [{ studentId, score }] sorted desc, set by endBonusRound()
+  bonusChampions: [], // host: studentId(s) with the highest final score (co-champions on a tie)
+  bonusTimers: { stallCheckId: null, maxCapTimeoutId: null }, // host: interval/timeout handles, cleared on finalize/reset
+  bonusRole: null, // client: 'player' | 'spectator' | null, set on BONUS_START receipt
+  bonusResult: null, // client: { standings, champions } stored on BONUS_END for later rendering (PR 4/5)
 };
 
 /**
@@ -642,6 +663,20 @@ function resetGame() {
   // session", even when triggered from SESSION_END.
   gameState.totalScores = {};
   gameState.finalRanking = [];
+  // Bonus-round state is ephemeral per session too (design.md §9 Migration /
+  // Rollout) — stop any pending host-side timers before wiping the fields so
+  // a stray stall check or 180s cap from a previous session can't fire into
+  // a freshly-reset LOBBY.
+  stopBonusStallCheck();
+  stopBonusMaxCapTimer();
+  gameState.bonusFinalists = [];
+  gameState.bonusScores = {};
+  gameState.bonusLastSeen = {};
+  gameState.bonusStartedAt = null;
+  gameState.bonusStandings = [];
+  gameState.bonusChampions = [];
+  gameState.bonusRole = null;
+  gameState.bonusResult = null;
   const selectCorrectAnswer = document.getElementById('input-correct-answer');
   if (selectCorrectAnswer) {
     selectCorrectAnswer.value = '';
@@ -675,6 +710,13 @@ function renderDashboard() {
   const btnNext = document.getElementById('btn-next-question');
   const btnSimulator = document.getElementById('btn-toggle-simulator');
   const btnEndSession = document.getElementById('btn-end-session');
+  // #btn-start-bonus / #btn-end-bonus don't exist in index.html yet — that
+  // markup lands in PR 4 (openspec/changes/husky-bonus-round/tasks.md 4.1).
+  // Looked up defensively here, same null-safe idiom as every other control
+  // on this dashboard, so the wiring is already correct the moment PR 4
+  // adds the elements.
+  const btnStartBonus = document.getElementById('btn-start-bonus');
+  const btnEndBonus = document.getElementById('btn-end-bonus');
   const boardTrack = document.getElementById('board-track');
 
   if (stateLabel) {
@@ -706,6 +748,16 @@ function renderDashboard() {
     // Usable any time except LOBBY (nothing to end yet) and SESSION_END
     // (already ended).
     btnEndSession.disabled = gameState.current === GAME_STATES.LOBBY || gameState.current === GAME_STATES.SESSION_END;
+  }
+
+  if (btnStartBonus) {
+    btnStartBonus.disabled = gameState.current !== GAME_STATES.SESSION_END;
+  }
+
+  if (btnEndBonus) {
+    // Manual "Finalizar ronda bonus" escape hatch (specs/bonus-round/spec.md
+    // — Round Finalization) — only meaningful while the round is in flight.
+    btnEndBonus.disabled = gameState.current !== GAME_STATES.BONUS_ROUND;
   }
 
   renderLeaderboardPanel();
@@ -1042,6 +1094,9 @@ function initDashboardControls() {
   const btnReset = document.getElementById('btn-reset-game');
   const btnSimulator = document.getElementById('btn-toggle-simulator');
   const btnEndSession = document.getElementById('btn-end-session');
+  // See renderDashboard()'s matching lookup — these elements arrive in PR 4.
+  const btnStartBonus = document.getElementById('btn-start-bonus');
+  const btnEndBonus = document.getElementById('btn-end-bonus');
   const selectCorrectAnswer = document.getElementById('input-correct-answer');
 
   if (btnStart) btnStart.addEventListener('click', startGame);
@@ -1049,6 +1104,8 @@ function initDashboardControls() {
   if (btnReset) btnReset.addEventListener('click', resetGame);
   if (btnSimulator) btnSimulator.addEventListener('click', toggleSimulator);
   if (btnEndSession) btnEndSession.addEventListener('click', endSession);
+  if (btnStartBonus) btnStartBonus.addEventListener('click', startBonusRound);
+  if (btnEndBonus) btnEndBonus.addEventListener('click', endBonusRound);
   if (selectCorrectAnswer) {
     selectCorrectAnswer.addEventListener('change', () => {
       gameState.correctAnswer = selectCorrectAnswer.value || null;
@@ -1085,6 +1142,13 @@ const MSG_TYPES = {
   START_QUESTION: 'START_QUESTION',
   ROUND_END: 'ROUND_END',
   SESSION_END: 'SESSION_END',
+  // Husky Bonus Round protocol (design.md §5 Protocol Schema) — same
+  // { type, payload } convention, relayed byte-for-byte like every type
+  // above. BONUS_START/BONUS_END are host -> all (broadcast); BONUS_SCORE
+  // is finalist -> host (unicast via the relay).
+  BONUS_START: 'BONUS_START',
+  BONUS_SCORE: 'BONUS_SCORE',
+  BONUS_END: 'BONUS_END',
 };
 
 // Control-plane message types exchanged with the relay server to establish
@@ -1362,6 +1426,26 @@ function handleHostMessage(message) {
       recordSubmission(studentId, choice, timestamp);
       break;
     }
+    case MSG_TYPES.BONUS_SCORE: {
+      const { studentId, score, alive } = message.payload || {};
+      // Ignore anything from a studentId that isn't a tracked finalist
+      // (stray/late message, or a spectator whose client somehow sent one) —
+      // `bonusScores` is only ever seeded with finalist IDs in
+      // startBonusRound().
+      if (!studentId || !gameState.bonusScores[studentId]) return;
+      const entry = gameState.bonusScores[studentId];
+      entry.score = typeof score === 'number' ? score : entry.score;
+      entry.alive = alive !== false;
+      // Hearing from a finalist again un-stalls them — the 5s timeout is the
+      // only disconnect signal available (design.md "Finalist disconnect
+      // mid-run"), so a late-arriving message after a brief stall just means
+      // they're back.
+      entry.stalled = false;
+      gameState.bonusLastSeen[studentId] = Date.now();
+      renderDashboard(); // PR 4's renderBonusLeaderboard() re-renders from here once it exists
+      checkBonusRoundFinalization();
+      break;
+    }
     default:
       break;
   }
@@ -1518,9 +1602,71 @@ function handleClientMessage(message) {
       gameState.controllerCountdownStop?.();
       break;
     }
+    case MSG_TYPES.BONUS_START: {
+      const finalists = (message.payload && message.payload.finalists) || [];
+      const isFinalist = finalists.includes(gameState.studentId);
+      gameState.bonusRole = isFinalist ? 'player' : 'spectator';
+      gameState.controllerCountdownStop?.();
+
+      if (!isFinalist) {
+        // Spectator Screen (specs/bonus-round/spec.md) — the actual
+        // dedicated spectator markup is PR 5; this reuses the existing
+        // question-text slot exactly like buildFinalResultsText() above, so
+        // there's no stale/blank screen in the meantime.
+        setControllerQuestionText('Ronda bonus en curso — los finalistas están jugando. Mirá el pizarrón.');
+        break;
+      }
+
+      setControllerQuestionText('Ronda bonus: ¡sos finalista! Tocá la pantalla para saltar.');
+
+      if (!window.BonusRound || typeof window.BonusRound.start !== 'function') {
+        // bonus-round.js isn't wired into index.html yet — that <script> tag
+        // and the #bonus-canvas element land in PR 5 (tasks.md 5.1/5.2).
+        // Guarded rather than assumed so this file doesn't throw once PR 3
+        // ships ahead of it.
+        break;
+      }
+
+      window.BonusRound.start({
+        // PR 5 wires this element into index.html (#controller-bonus wrapper
+        // + <canvas id="bonus-canvas">, tasks.md 5.2). Until then this is
+        // null, which bonus-round.js already treats as a valid headless run
+        // (see bonus-round.js's initCanvas()).
+        canvas: document.getElementById('bonus-canvas'),
+        onScore: (score) => sendBonusScore(score, true),
+        onEnd: (score) => sendBonusScore(score, false),
+      });
+      break;
+    }
+    case MSG_TYPES.BONUS_END: {
+      const standings = (message.payload && message.payload.standings) || [];
+      const champions = (message.payload && message.payload.champions) || [];
+      gameState.bonusResult = { standings, champions };
+      if (gameState.bonusRole === 'player' && window.BonusRound && typeof window.BonusRound.stop === 'function') {
+        window.BonusRound.stop();
+      }
+      break;
+    }
     default:
       break;
   }
+}
+
+/**
+ * Sends this device's current bonus-round score to the host over the
+ * existing student -> host relay socket. Mirrors the SUBMIT send pattern in
+ * initControllerOptions() below. Called by bonus-round.js's `onScore`
+ * (throttled ~300ms, `alive: true`) and `onEnd` (immediate, unthrottled,
+ * `alive: false`) callbacks — see design.md §5 Protocol Schema.
+ * @param {number} score
+ * @param {boolean} alive
+ */
+function sendBonusScore(score, alive) {
+  if (!gameState.relaySocket || gameState.relaySocket.readyState !== WebSocket.OPEN) return;
+  gameState.relaySocket.send(JSON.stringify({
+    type: MSG_TYPES.BONUS_SCORE,
+    payload: { studentId: gameState.studentId, score, alive },
+  }));
 }
 
 /**
@@ -1613,6 +1759,200 @@ function initControllerOptions() {
       setControllerQuestionText(`Answer "${choice}" submitted! Waiting for round results…`);
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Husky Bonus Round — message contract + host-side state machine wiring
+// (openspec/changes/husky-bonus-round). Host-authoritative like everything
+// else in this file: the host derives finalists, broadcasts BONUS_START,
+// aggregates BONUS_SCORE, decides when the round is over, and broadcasts
+// BONUS_END. Finalist devices only run bonus-round.js's loop and report a
+// number back — see the BONUS_START/BONUS_END handling in
+// handleClientMessage() above.
+//
+// Deliberately does not read or write gameState.totalScores,
+// gameState.finalRanking, or anything already broadcast as the quiz
+// champion (specs/bonus-round/spec.md — Independence from Quiz Scoring).
+// ---------------------------------------------------------------------------
+
+// 5s of silence from a finalist marks them `stalled` (design.md "Finalist
+// disconnect mid-run" — the relay never notifies the host of a drop, so a
+// timeout is the only available signal; >16x the 300ms report interval).
+const BONUS_STALE_MS = 5000;
+// Hard cap on round length from BONUS_START, regardless of how many
+// finalists are still alive (specs/bonus-round/spec.md — Round Finalization).
+const BONUS_MAX_MS = 180000;
+// How often the host polls bonusLastSeen for newly-stalled finalists.
+const BONUS_STALL_CHECK_INTERVAL_MS = 1000;
+
+/**
+ * Derives the bonus-round finalist set from the already-computed, descending
+ * final quiz ranking: the top 3 students, plus every additional student tied
+ * with the 3rd-place score (specs/bonus-round/spec.md — Finalist Derivation).
+ * Pure function of its input — does not read or mutate gameState.
+ * @param {Array<{studentId: string, score: number}>} finalRanking - sorted
+ *   descending by score (see endSession())
+ * @returns {Array<string>} finalist studentIds
+ */
+function deriveBonusFinalists(finalRanking) {
+  if (!Array.isArray(finalRanking) || finalRanking.length === 0) return [];
+  if (finalRanking.length <= 3) return finalRanking.map((entry) => entry.studentId);
+
+  const thirdPlaceScore = finalRanking[2].score;
+  return finalRanking
+    .filter((entry, index) => index < 3 || entry.score === thirdPlaceScore)
+    .map((entry) => entry.studentId);
+}
+
+/**
+ * Host action: transitions SESSION_END -> BONUS_ROUND, derives finalists
+ * from the already-broadcast final quiz ranking, seeds per-finalist
+ * score/alive/stalled tracking, and broadcasts BONUS_START to all connected
+ * clients. Receivers self-select player vs spectator by finalist-list
+ * membership (see handleClientMessage()'s BONUS_START case) — the relay
+ * only supports broadcastToStudents(), it has no per-client targeting, so
+ * the finalist list travels in the payload instead.
+ * @satisfies specs/bonus-round/spec.md — Finalist Derivation, Bonus Round Start
+ */
+function startBonusRound() {
+  if (gameState.current !== GAME_STATES.SESSION_END) return;
+
+  const finalists = deriveBonusFinalists(gameState.finalRanking);
+
+  gameState.bonusFinalists = finalists;
+  gameState.bonusScores = {};
+  gameState.bonusLastSeen = {};
+  gameState.bonusStandings = [];
+  gameState.bonusChampions = [];
+
+  const startedAt = Date.now();
+  gameState.bonusStartedAt = startedAt;
+
+  finalists.forEach((studentId) => {
+    gameState.bonusScores[studentId] = { score: 0, alive: true, stalled: false };
+    gameState.bonusLastSeen[studentId] = startedAt;
+  });
+
+  setGameState(GAME_STATES.BONUS_ROUND);
+
+  broadcastToStudents({
+    type: MSG_TYPES.BONUS_START,
+    payload: { finalists, maxDurationMs: BONUS_MAX_MS },
+  });
+
+  startBonusStallCheck();
+  startBonusMaxCapTimer();
+}
+
+/**
+ * Polls gameState.bonusLastSeen every BONUS_STALL_CHECK_INTERVAL_MS and
+ * marks any finalist `stalled` once BONUS_STALE_MS has passed since their
+ * last BONUS_SCORE — their last known score stays frozen and still counts
+ * toward finalization (specs/bonus-round/spec.md — Stalled Finalist Handling).
+ */
+function startBonusStallCheck() {
+  stopBonusStallCheck();
+  gameState.bonusTimers.stallCheckId = window.setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+
+    gameState.bonusFinalists.forEach((studentId) => {
+      const entry = gameState.bonusScores[studentId];
+      if (!entry || entry.alive === false || entry.stalled) return;
+      const lastSeen = gameState.bonusLastSeen[studentId] || 0;
+      if (now - lastSeen >= BONUS_STALE_MS) {
+        entry.stalled = true;
+        changed = true;
+      }
+    });
+
+    if (changed) renderDashboard();
+    checkBonusRoundFinalization();
+  }, BONUS_STALL_CHECK_INTERVAL_MS);
+}
+
+function stopBonusStallCheck() {
+  if (gameState.bonusTimers.stallCheckId === null) return;
+  window.clearInterval(gameState.bonusTimers.stallCheckId);
+  gameState.bonusTimers.stallCheckId = null;
+}
+
+/**
+ * Schedules the 180s hard cap (specs/bonus-round/spec.md — Round
+ * Finalization: "OR 180 seconds have elapsed since BONUS_START ... whichever
+ * occurs first"). endBonusRound() is itself idempotent-guarded on
+ * gameState.current, so this firing after the round already finalized by
+ * another path is harmless.
+ */
+function startBonusMaxCapTimer() {
+  stopBonusMaxCapTimer();
+  gameState.bonusTimers.maxCapTimeoutId = window.setTimeout(() => {
+    endBonusRound();
+  }, BONUS_MAX_MS);
+}
+
+function stopBonusMaxCapTimer() {
+  if (gameState.bonusTimers.maxCapTimeoutId === null) return;
+  window.clearTimeout(gameState.bonusTimers.maxCapTimeoutId);
+  gameState.bonusTimers.maxCapTimeoutId = null;
+}
+
+/**
+ * Checks the "all finalists dead-or-stalled" finalization condition
+ * (specs/bonus-round/spec.md — Round Finalization) and ends the round if it
+ * holds. Called after every BONUS_SCORE update and every stall-check tick —
+ * the other two finalization triggers (180s cap, manual host end) call
+ * endBonusRound() directly instead of going through this check.
+ */
+function checkBonusRoundFinalization() {
+  if (gameState.current !== GAME_STATES.BONUS_ROUND) return;
+  if (gameState.bonusFinalists.length === 0) return;
+
+  const allDoneOrStalled = gameState.bonusFinalists.every((studentId) => {
+    const entry = gameState.bonusScores[studentId];
+    return !entry || entry.alive === false || entry.stalled;
+  });
+
+  if (allDoneOrStalled) endBonusRound();
+}
+
+/**
+ * Finalizes the bonus round: stops both host-side timers, computes final
+ * standings + champion(s) from each finalist's last known score (frozen
+ * scores from stalled finalists still count), transitions to BONUS_RESULTS,
+ * and broadcasts BONUS_END to ALL connected clients — finalists and
+ * spectators alike (design.md Decision #5: host -> all broadcast, not
+ * finalist -> host, specifically so spectators also see the champion
+ * reveal). Ties at the highest score all become co-champions, no tiebreaker
+ * (specs/bonus-round/spec.md — Champion Reveal).
+ *
+ * Reachable via three paths, whichever fires first: checkBonusRoundFinalization()
+ * (all dead-or-stalled), startBonusMaxCapTimer()'s 180s timeout, or the
+ * manual "Finalizar ronda bonus" host control wired in initDashboardControls().
+ * Guarded on gameState.current so a second caller (e.g. the 180s timer
+ * firing just after the manual button was clicked) is a safe no-op.
+ */
+function endBonusRound() {
+  if (gameState.current !== GAME_STATES.BONUS_ROUND) return;
+
+  stopBonusStallCheck();
+  stopBonusMaxCapTimer();
+
+  const standings = gameState.bonusFinalists
+    .map((studentId) => ({ studentId, score: (gameState.bonusScores[studentId] || {}).score || 0 }))
+    .sort((a, b) => b.score - a.score);
+
+  const topScore = standings.length > 0 ? standings[0].score : 0;
+  const champions = standings
+    .filter((entry) => entry.score === topScore)
+    .map((entry) => entry.studentId);
+
+  gameState.bonusStandings = standings;
+  gameState.bonusChampions = champions;
+
+  setGameState(GAME_STATES.BONUS_RESULTS);
+
+  broadcastToStudents({ type: MSG_TYPES.BONUS_END, payload: { standings, champions } });
 }
 
 // ---------------------------------------------------------------------------

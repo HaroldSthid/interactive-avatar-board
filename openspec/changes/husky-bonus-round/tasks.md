@@ -108,65 +108,71 @@ Rationale: per `design.md` "Honest sizing" — this is the largest net-new piece
 
 ## Phase 3: Message Contract + app.js State Machine Wiring (PR 3)
 
-- [ ] 3.1 Add `BONUS_ROUND`, `BONUS_RESULTS` to `GAME_STATES` (`app.js:165`).
+- [x] 3.1 Add `BONUS_ROUND`, `BONUS_RESULTS` to `GAME_STATES` (`app.js:165`).
   - Satisfies: `design.md` §2 Decision 6 (round states)
   - Depends on: nothing (can start once PR 1/2 expose `window.BonusRound`)
   - Parallelizable: yes
 
-- [ ] 3.2 Add `gameState.bonusFinalists`, `bonusScores`, `bonusLastSeen`, `bonusTimers` fields (`app.js:197`).
+- [x] 3.2 Add `gameState.bonusFinalists`, `bonusScores`, `bonusLastSeen`, `bonusTimers` fields (`app.js:197`).
   - Satisfies: `design.md` §7 File Changes
   - Depends on: 3.1
   - Parallelizable: no
+  - **Note**: also added `bonusStartedAt`, `bonusStandings`, `bonusChampions` (host) and `bonusRole`, `bonusResult` (client) — not named in design.md's file-changes list but required for the 180s hard-cap reference and to hold BONUS_END's payload for PR 4/5 to render. All new fields live under the same "Husky Bonus Round" block in `gameState`, none touch `totalScores`/`finalRanking`.
 
-- [ ] 3.3 Add `BONUS_START`, `BONUS_SCORE`, `BONUS_END` to `MSG_TYPES` (`app.js:1081`).
+- [x] 3.3 Add `BONUS_START`, `BONUS_SCORE`, `BONUS_END` to `MSG_TYPES` (`app.js:1081`).
   - Satisfies: `design.md` §5 Protocol Schema
   - Depends on: 3.1
   - Parallelizable: yes
 
-- [ ] 3.4 Implement `startBonusRound()`: derive finalists from `gameState.finalRanking` (top 3 + all ties at 3rd), set `gameState.current = BONUS_ROUND`, broadcast `BONUS_START{finalists, maxDurationMs:180000}`, init `bonusLastSeen` per finalist (`app.js` near 1016).
+- [x] 3.4 Implement `startBonusRound()`: derive finalists from `gameState.finalRanking` (top 3 + all ties at 3rd), set `gameState.current = BONUS_ROUND`, broadcast `BONUS_START{finalists, maxDurationMs:180000}`, init `bonusLastSeen` per finalist (`app.js` near 1016).
   - Satisfies: `specs/bonus-round/spec.md` — Finalist Derivation, Bonus Round Start; `specs/avatar-board/spec.md` — Leaderboard and Ranking (host starts bonus round after session end)
   - Depends on: 3.2, 3.3
   - Parallelizable: no
 
-- [ ] 3.5 Add host control on the `SESSION_END` screen invoking `startBonusRound()`.
+- [x] 3.5 Add host control on the `SESSION_END` screen invoking `startBonusRound()`.
   - Satisfies: `specs/bonus-round/spec.md` — Bonus Round Start
   - Depends on: 3.4
   - Parallelizable: no
+  - **Note**: `#btn-start-bonus`/`#btn-end-bonus` markup doesn't exist in `index.html` yet (that's PR 4, task 4.1) — wired defensively via the existing null-safe `document.getElementById()` idiom in `initDashboardControls()`/`renderDashboard()`, so the click handler and disabled-state gating are already correct the moment PR 4 adds the elements. `index.html` itself is untouched by this PR, per scope.
 
-- [ ] 3.6 Extend `handleHostMessage` (`app.js:1348`): on `BONUS_SCORE`, update `gameState.bonusScores[studentId]`, refresh `bonusLastSeen[studentId]`, trigger leaderboard re-render, check finalization conditions.
+- [x] 3.6 Extend `handleHostMessage` (`app.js:1348`): on `BONUS_SCORE`, update `gameState.bonusScores[studentId]`, refresh `bonusLastSeen[studentId]`, trigger leaderboard re-render, check finalization conditions.
   - Satisfies: `specs/bonus-round/spec.md` — Score Reporting, Live Host Leaderboard
   - Depends on: 3.4
   - Parallelizable: no
+  - **Note**: "trigger leaderboard re-render" calls the existing `renderDashboard()` — `renderBonusLeaderboard()` itself is PR 4 (task 4.2); this PR structures `gameState.bonusScores` so PR 4 can render it directly and just adds the call site inside `renderDashboard()`.
 
-- [ ] 3.7 Implement stalled-finalist detection: periodic check of `bonusLastSeen`, mark `stalled` after 5s silence (`BONUS_STALE_MS`), freeze last known score (still counted).
+- [x] 3.7 Implement stalled-finalist detection: periodic check of `bonusLastSeen`, mark `stalled` after 5s silence (`BONUS_STALE_MS`), freeze last known score (still counted).
   - Satisfies: `specs/bonus-round/spec.md` — Stalled Finalist Handling
   - Depends on: 3.6
   - Parallelizable: no
 
-- [ ] 3.8 Implement round-finalization logic: finalize when all finalists dead-or-stalled, OR 180s elapsed since `BONUS_START` (`BONUS_MAX_MS`), OR host manual end — whichever first; compute champion(s) as highest-score finalist(s), ties → co-champions array.
+- [x] 3.8 Implement round-finalization logic: finalize when all finalists dead-or-stalled, OR 180s elapsed since `BONUS_START` (`BONUS_MAX_MS`), OR host manual end — whichever first; compute champion(s) as highest-score finalist(s), ties → co-champions array.
   - Satisfies: `specs/bonus-round/spec.md` — Round Finalization, Champion Reveal
   - Depends on: 3.7
   - Parallelizable: no
 
-- [ ] 3.9 Implement `endBonusRound()`: set `gameState.current = BONUS_RESULTS`, broadcast `BONUS_END{standings, champions}`.
+- [x] 3.9 Implement `endBonusRound()`: set `gameState.current = BONUS_RESULTS`, broadcast `BONUS_END{standings, champions}`.
   - Satisfies: `specs/bonus-round/spec.md` — Champion Reveal
   - Depends on: 3.8
   - Parallelizable: no
 
-- [ ] 3.10 Add manual "Finalizar ronda bonus" host control invoking `endBonusRound()` early.
+- [x] 3.10 Add manual "Finalizar ronda bonus" host control invoking `endBonusRound()` early.
   - Satisfies: `specs/bonus-round/spec.md` — Round Finalization (host manually ends the round)
   - Depends on: 3.9
   - Parallelizable: no
+  - **Note**: same `#btn-end-bonus` deferred-markup situation as 3.5 above.
 
-- [ ] 3.11 Extend `handleClientMessage` (`app.js:1477`): on `BONUS_START`, self-select player vs spectator by finalist-list membership; for players, call `window.BonusRound.start(...)` wiring `onScore` → throttled `BONUS_SCORE{alive:true}` every 300ms and `onEnd` → unthrottled `BONUS_SCORE{alive:false}`; on `BONUS_END`, store standings/champion(s) for rendering.
+- [x] 3.11 Extend `handleClientMessage` (`app.js:1477`): on `BONUS_START`, self-select player vs spectator by finalist-list membership; for players, call `window.BonusRound.start(...)` wiring `onScore` → throttled `BONUS_SCORE{alive:true}` every 300ms and `onEnd` → unthrottled `BONUS_SCORE{alive:false}`; on `BONUS_END`, store standings/champion(s) for rendering.
   - Satisfies: `specs/bonus-round/spec.md` — Bonus Round Start (client self-select), Score Reporting
   - Depends on: 3.9, 1.6
   - Parallelizable: no
+  - **Note**: the 300ms throttle already lives inside `bonus-round.js`'s `onScore` callback (PR 1/2, `SCORE_REPORT_INTERVAL`) — `sendBonusScore()` here just forwards each callback as one `BONUS_SCORE` send, no double-throttling added. `canvas` is passed as `document.getElementById('bonus-canvas')` (`null` today — PR 5 wires the actual element into `index.html`); `window.BonusRound` presence is guard-checked since `<script src="bonus-round.js">` isn't wired into `index.html` yet either (PR 5, task 5.1).
 
-- [ ] 3.12 Manual verification: host tab + 3-4 finalist tabs. Confirm finalist self-selection on `BONUS_START`, `BONUS_SCORE` throttling (~13 small frames/s across finalists via devtools WS panel), stalled detection via airplane mode, finalization on all-dead.
+- [x] 3.12 Manual verification: host tab + 3-4 finalist tabs. Confirm finalist self-selection on `BONUS_START`, `BONUS_SCORE` throttling (~13 small frames/s across finalists via devtools WS panel), stalled detection via airplane mode, finalization on all-dead.
   - Satisfies: `design.md` §8 Testing Strategy — Simultaneous play, Disconnect mid-run layers
   - Depends on: 3.11
   - Parallelizable: no
+  - **Verification method**: no browser/multi-tab tooling available in this environment (same constraint as PR 2's 2.5), and `index.html`/`style.css` wiring for the canvas/spectator screen doesn't exist until PR 5, so a real multi-tab browser session isn't possible yet. Verified instead via a Node script (`vm`-sandboxed `app.js`, stubbed `document`/`WebSocket`/timers) exercising the actual `deriveBonusFinalists()`, `startBonusRound()`, `endBonusRound()`, `checkBonusRoundFinalization()` functions: (1) finalist derivation with no tie (exactly top 3) and with a tie at 3rd (4 finalists); (2) `startBonusRound()` transitions `SESSION_END → BONUS_ROUND`, broadcasts `BONUS_START` with the correct finalist list, seeds `bonusScores`/`bonusLastSeen`, and leaves `gameState.finalRanking` untouched; (3) stall detection via a backdated `bonusLastSeen` timestamp correctly flips `stalled` only past the 5s threshold; (4) finalization fires when all finalists are dead-or-stalled, broadcasting `BONUS_END`; (5) co-champion detection on a tied top score; (6) manual host end finalizes early using last-known (possibly still-alive) scores and is idempotent against a second call. The 180s hard-cap path itself (`startBonusMaxCapTimer`) wasn't run to completion (that would require a real 180s wait) but calls the same already-verified `endBonusRound()`. Full multi-device/devtools-WS-panel verification is deferred to PR 5/6 once the canvas and spectator screen exist to actually play through.
 
 ---
 
