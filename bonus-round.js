@@ -363,17 +363,30 @@ function drawObstacles(ctx, obstacles) {
   ctx.restore();
 }
 
+// Sprites render larger than the (unchanged) collision hitbox — 36x36 world
+// px reads as an illegible blob on a phone screen at this world's ~0.8x CSS
+// display scale (confirmed via real-device screenshot: the multi-shape
+// silhouette came through as visual noise, not a recognizable dog). Purely
+// a draw-size multiplier, centered on the same hitbox center — physics and
+// collision (huskyBox/insetBox) are untouched.
+const SPRITE_DRAW_SCALE = 1.6;
+
 function drawHusky(ctx, state) {
   const sprite = huskySprite(state);
   const box = huskyBox(state);
+  const drawWidth = box.width * SPRITE_DRAW_SCALE;
+  const drawHeight = box.height * SPRITE_DRAW_SCALE;
+  const drawX = box.x + box.width / 2 - drawWidth / 2;
+  const drawY = box.y + box.height - drawHeight; // feet stay planted on the ground line
   // `complete && naturalWidth > 0` guards against drawing a sprite that
-  // errored (decode() tolerated the failure above but left a broken image).
+  // errored (load failure tolerated above but left a broken image).
   if (sprite && sprite.complete && sprite.naturalWidth > 0) {
-    ctx.drawImage(sprite, box.x, box.y, box.width, box.height);
+    ctx.drawImage(sprite, drawX, drawY, drawWidth, drawHeight);
   } else {
     // Fallback while sprites are still loading (shouldn't normally be
-    // visible — start() gates on the decode promise) or if one failed to
-    // load: a flat rect keeps the run visibly alive instead of blank.
+    // visible — start() gates on the onload/onerror promise) or if one
+    // failed to load: a flat rect keeps the run visibly alive instead of
+    // blank.
     ctx.fillStyle = state.phase === 'dead' ? COLOR_NEON_MAGENTA : COLOR_NEON_CYAN;
     ctx.fillRect(box.x, box.y, box.width, box.height);
   }
