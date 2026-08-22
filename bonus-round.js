@@ -281,9 +281,23 @@ let spritesReadyPromise = null;
 
 /**
  * Creates the 4 sprite `Image`s and returns a promise that resolves once
- * every one has decoded (or failed to — a broken/missing sprite must not
- * hang the round forever, so decode failures are tolerated and fall back to
+ * every one has loaded (or failed to — a broken/missing sprite must not
+ * hang the round forever, so load failures are tolerated and fall back to
  * the flat-rect placeholder in `drawHusky`).
+ *
+ * Gates on `onload`/`onerror`, not `HTMLImageElement.decode()` — real-device
+ * testing showed `decode()` on these SVG sources rejecting (or resolving
+ * without the image actually being paintable yet) on at least one mobile
+ * browser, even though the file itself served fine (verified via direct
+ * HTTP fetch: 200, correct `image/svg+xml` content-type). Since the
+ * rejection was caught, `start()` still proceeded to 'running', but every
+ * frame's `sprite.complete && sprite.naturalWidth > 0` check in `drawHusky`
+ * kept failing for the whole run, so it silently drew the flat-rect
+ * fallback the entire time instead of the sprite. `onload`/`onerror` is the
+ * long-established, universally-supported readiness signal for `<img>`
+ * across browsers (decode() is a newer, less consistently implemented API)
+ * — using it for both preload-gating and the draw-time check keeps both in
+ * agreement.
  * No-ops (resolves with `null`) outside a DOM (headless/Node manual test).
  */
 function loadSprites() {
@@ -296,17 +310,16 @@ function loadSprites() {
   const images = {};
   const decodePromises = Object.keys(SPRITE_FILES).map((key) => {
     const img = new Image();
-    img.src = SPRITE_DIR + SPRITE_FILES[key];
     images[key] = img;
-    if (typeof img.decode === 'function') {
-      // decode() rejects on load failure — tolerated, see doc comment above.
-      return img.decode().catch(() => {});
-    }
-    // Fallback for environments without decode(): resolve on load/error.
-    return new Promise((resolve) => {
+    const ready = new Promise((resolve) => {
       img.onload = resolve;
       img.onerror = resolve;
     });
+    img.src = SPRITE_DIR + SPRITE_FILES[key];
+    // Some browsers fire onload synchronously (or before the listener above
+    // is guaranteed attached) when the image is already cached — assigning
+    // `src` after the listeners are wired avoids missing that event.
+    return ready;
   });
 
   spriteImages = images;
