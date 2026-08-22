@@ -1964,6 +1964,10 @@ function startBonusRound() {
   if (gameState.current !== GAME_STATES.SESSION_END) return;
 
   const finalists = deriveBonusFinalists(gameState.finalRanking);
+  // No scored students to promote (e.g. a session ended with nobody
+  // answering) — nothing to play, so stay in SESSION_END rather than
+  // entering a bonus round that can never auto-finalize.
+  if (finalists.length === 0) return;
 
   gameState.bonusFinalists = finalists;
   gameState.bonusScores = {};
