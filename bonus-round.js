@@ -70,8 +70,9 @@ const GROUND_Y = 130; // world Y where the husky's feet rest when grounded
 // makes a near-miss read as fair.
 const HITBOX_INSET_RATIO = 0.15;
 
-// Obstacle sizing — NOT specified by design.md; varied cactus-style heights
-// so the ramp also reads as visually harder, not just faster.
+// Obstacle sizing — NOT specified by design.md; varied traffic-cone heights
+// (see drawObstacles()) so the ramp also reads as visually harder, not just
+// faster.
 const OBSTACLE_MIN_WIDTH = 18;
 const OBSTACLE_MAX_WIDTH = 32;
 const OBSTACLE_MIN_HEIGHT = 20;
@@ -124,6 +125,9 @@ const COLOR_BG = '#0a0a14';
 const COLOR_NEON_CYAN = '#00f0ff';
 const COLOR_NEON_MAGENTA = '#ff00c8';
 const COLOR_TEXT = '#e6e6f0';
+const COLOR_CONE_ORANGE = '#ff8c1a';
+const COLOR_CONE_STRIPE = '#f5f5f5';
+const COLOR_CONE_BASE = '#1a1a24';
 
 // Procedural scrolling-ground dash pattern — NOT specified by design.md
 // beyond "scrolling dashed line" (design.md §3 Game Loop draw block).
@@ -352,13 +356,38 @@ function drawGround(ctx, distance) {
   ctx.stroke();
 }
 
+/**
+ * Draws each obstacle as a traffic cone (triangle body + stripe + base
+ * plate) sized to its existing hitbox bounding box — purely a redraw of the
+ * same `obstacle.{x,y,width,height}` the AABB collision in stepBonusRound()
+ * already uses, so difficulty/fairness is untouched. Varied obstacle sizes
+ * (OBSTACLE_MIN/MAX_WIDTH/HEIGHT) now read as visibly different cone sizes.
+ */
 function drawObstacles(ctx, obstacles) {
   ctx.save();
-  ctx.fillStyle = COLOR_NEON_MAGENTA;
-  ctx.shadowColor = COLOR_NEON_MAGENTA;
-  ctx.shadowBlur = 6;
   for (const obstacle of obstacles) {
-    ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    const { x, y, width, height } = obstacle;
+    const baseHeight = Math.max(3, height * 0.18);
+    const bodyBottom = y + height - baseHeight;
+
+    ctx.fillStyle = COLOR_CONE_ORANGE;
+    ctx.strokeStyle = COLOR_NEON_MAGENTA;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x + width / 2, y);
+    ctx.lineTo(x + width, bodyBottom);
+    ctx.lineTo(x, bodyBottom);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const stripeY = y + (bodyBottom - y) * 0.55;
+    const stripeHalfWidth = (width / 2) * ((stripeY - y) / (bodyBottom - y));
+    ctx.fillStyle = COLOR_CONE_STRIPE;
+    ctx.fillRect(x + width / 2 - stripeHalfWidth, stripeY, stripeHalfWidth * 2, Math.max(2, height * 0.08));
+
+    ctx.fillStyle = COLOR_CONE_BASE;
+    ctx.fillRect(x, bodyBottom, width, baseHeight);
   }
   ctx.restore();
 }
