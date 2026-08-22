@@ -53,7 +53,7 @@ The Host board MUST render student avatars animating towards their selected quad
 ---
 
 ### Requirement: Leaderboard and Ranking
-The Host board MUST calculate response speed as response timestamp minus question start timestamp, and MUST rank correct answers in ascending order of speed.
+The Host board MUST calculate response speed as response timestamp minus question start timestamp, and MUST rank correct answers in ascending order of speed. After the session ends, the host MAY trigger a transition into a `BONUS_ROUND` state per the `bonus-round` capability; this transition MUST NOT retroactively alter the already-computed final quiz ranking or the announced quiz champion.
 
 #### Scenario: Host compiles leaderboard
 - GIVEN a question started at timestamp 1723400000000
@@ -61,6 +61,12 @@ The Host board MUST calculate response speed as response timestamp minus questio
 - AND Student ID "STUDENT_B" submitted correct quadrant "A" at timestamp 1723400000200 (speed: 200ms)
 - WHEN the Host processes round results
 - THEN the leaderboard MUST rank "STUDENT_B" above "STUDENT_A"
+
+#### Scenario: Host starts bonus round after session end
+- GIVEN the session has ended and the final quiz ranking has been computed and announced
+- WHEN the host triggers the bonus round transition
+- THEN the system MUST enter `BONUS_ROUND` per the `bonus-round` capability
+- AND the final quiz ranking and quiz champion display MUST remain unchanged
 
 ---
 

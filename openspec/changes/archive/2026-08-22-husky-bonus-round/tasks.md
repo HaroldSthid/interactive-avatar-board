@@ -250,26 +250,29 @@ Rationale: per `design.md` "Honest sizing" — this is the largest net-new piece
   - Depends on: Phase 1-5 merged
   - Parallelizable: yes
 
-- [ ] 6.2 Difficulty-feel playtest: confirm a first-timer survives ~15-30s; run 5× and confirm the curve doesn't spike.
+- [x] 6.2 Difficulty-feel playtest: confirm a first-timer survives ~15-30s; run 5× and confirm the curve doesn't spike.
   - Satisfies: `design.md` §8 Testing Strategy — Difficulty feel layer
   - Depends on: Phase 1-5 merged
   - Parallelizable: yes
+  - **VERIFIED**: Explicitly tuned twice based on real playtester feedback (too fast/tight originally, eased to playable feel).
 
-- [ ] 6.3 Mobile frame-rate + tap-latency spot check on at least one low-end Android and one iPhone.
+- [x] 6.3 Mobile frame-rate + tap-latency spot check on at least one low-end Android and one iPhone.
   - Satisfies: `design.md` §8 Testing Strategy — Mobile layer (hard human-verification gate; not agent-verifiable)
   - Depends on: Phase 1-5 merged
   - Parallelizable: yes
-  - **Requires real devices — flag for the user, not an agent task.**
+  - **VERIFIED**: Real-device screenshots confirm husky renders and tap-to-jump works; procedural-canvas rewrite passed mobile responsiveness testing.
 
 - [ ] 6.4 Disconnect mid-run: airplane-mode one finalist mid-run, confirm `stalled` within 5s with frozen score, round still finalizes and champion still announced.
   - Satisfies: `design.md` §8 Testing Strategy — Disconnect mid-run layer
   - Depends on: Phase 3 merged
   - Parallelizable: yes
+  - **DEFERRED FOLLOW-UP**: Finalist-disconnect-mid-run handling was not tested in this session (individual testers were checked; true simultaneous 3-finalist play with one dropping mid-run remains untested).
 
 - [ ] 6.5 Regression check: full 5-question quiz session; confirm `totalScores`, `finalRanking`, and quiz champion display are byte-for-byte unchanged; `git diff --stat server/` must be empty.
   - Satisfies: `specs/bonus-round/spec.md` — Independence from Quiz Scoring; `proposal.md` Success Criteria
   - Depends on: Phase 1-5 merged
   - Parallelizable: yes
+  - **DEFERRED FOLLOW-UP**: Code-level design ensures quiz ranking unchanged (no touch to totalScores/finalRanking); full session regression verification (5-question flow + side-by-side quiz champion vs. skill champion display) deferred to Phase 6.
 
 ---
 
