@@ -194,10 +194,66 @@ function spawnObstacle(state) {
   state.obstacles.push({ x: WORLD_WIDTH, y: GROUND_Y - height, width, height });
 }
 
+// ---------------------------------------------------------------------------
+// Sound effects (Web Audio API, no external files) — same technique as
+// app.js's countdown tick/alarm (playTick/getAudioContext): synthesized
+// oscillator tones, so there's no audio asset to source or license, and no
+// failure mode beyond "silently does nothing" if Web Audio isn't available.
+// A separate, tiny AudioContext here rather than reusing app.js's (private,
+// not exposed on window) — bonus-round.js stays self-contained behind its
+// narrow start()/stop() surface, same as it already is for canvas/input.
+// Two cues only, not a running-footsteps loop: several students' phones
+// play at once in the same room, and a continuous sound from each stacks
+// into noise fast, where a short jump/hit cue doesn't.
+// ---------------------------------------------------------------------------
+
+let bonusAudioContext = null;
+
+function getBonusAudioContext() {
+  if (typeof window === 'undefined') return null;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!bonusAudioContext) {
+    bonusAudioContext = new AudioContextClass();
+  }
+  if (bonusAudioContext.state === 'suspended') {
+    bonusAudioContext.resume().catch(() => {});
+  }
+  return bonusAudioContext;
+}
+
+/**
+ * Plays a short, click-free tone with a linear frequency sweep and an
+ * exponential gain ramp-down (avoids the audible "pop" a hard stop causes).
+ * No-ops outside a DOM (headless/Node manual test) via getBonusAudioContext's
+ * `typeof window` guard.
+ */
+function playSweep(startFreq, endFreq, durationSec, type, volume) {
+  const ctx = getBonusAudioContext();
+  if (!ctx) return;
+
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = type;
+  const now = ctx.currentTime;
+  oscillator.frequency.setValueAtTime(startFreq, now);
+  oscillator.frequency.linearRampToValueAtTime(endFreq, now + durationSec);
+
+  gain.gain.value = volume;
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec);
+
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+
+  oscillator.start(now);
+  oscillator.stop(now + durationSec);
+}
+
 function jump(state) {
   if (state.phase !== 'running' || !state.grounded) return;
   state.huskyVy = JUMP_VELOCITY;
   state.grounded = false;
+  playSweep(320, 640, 0.12, 'square', 0.12); // short upward chirp
 }
 
 function die(state) {
@@ -207,6 +263,7 @@ function die(state) {
     cancelAnimationFrame(state.rafId);
   }
   state.rafId = null;
+  playSweep(180, 70, 0.25, 'sawtooth', 0.16); // low, dry thud
   if (typeof state.onEnd === 'function') state.onEnd(state.score);
 }
 
