@@ -637,6 +637,15 @@ button {
   min-height: 300px;
 }
 
+/* Author `display` rules always beat the browser's built-in [hidden]
+   behavior once a class sets `display` on the same element (same pattern
+   already handled for .view/.timer-bar/.board-leaderboard above) — without
+   this, app.js's hidden-attribute toggle between the quiz grid and the
+   bonus canvas (BONUS_START handler) has no visual effect. */
+.controller-grid[hidden] {
+  display: none;
+}
+
 /* Fixed-height cells regardless of answer text length: A/B/C/D used to be
    single letters (font-size: 2rem worked fine), but now show full answer
    text (e.g. "B. París") of varying lengths — without a uniform min-height
@@ -681,6 +690,13 @@ button {
   display: flex;
   justify-content: center;
   padding: var(--spacing-md) 0;
+}
+
+/* Same [hidden]-override issue as .controller-grid above: without this, the
+   canvas is visible (empty) from page load instead of only during the
+   bonus round. */
+.controller-bonus[hidden] {
+  display: none;
 }
 
 .controller-bonus__canvas {
