@@ -253,7 +253,7 @@ function jump(state) {
   if (state.phase !== 'running' || !state.grounded) return;
   state.huskyVy = JUMP_VELOCITY;
   state.grounded = false;
-  playSweep(320, 640, 0.12, 'square', 0.12); // short upward chirp
+  playSweep(320, 640, 0.12, 'square', 0.18); // short upward chirp
 }
 
 function die(state) {
@@ -263,7 +263,7 @@ function die(state) {
     cancelAnimationFrame(state.rafId);
   }
   state.rafId = null;
-  playSweep(180, 70, 0.25, 'sawtooth', 0.16); // low, dry thud
+  playSweep(180, 70, 0.25, 'sawtooth', 0.22); // low, dry thud
   if (typeof state.onEnd === 'function') state.onEnd(state.score);
 }
 
@@ -587,7 +587,16 @@ function initCanvas(state, canvas) {
 }
 
 function attachInputHandlers(state) {
-  const onJump = () => jump(state);
+  const onJump = () => {
+    // Unlocks/warms the AudioContext on every tap, even one jump() itself
+    // ignores (e.g. mid-air, or before the round has started) — otherwise a
+    // run where the first collision happens before any *successful* jump
+    // never gets a user-gesture-context tap at all, and die()'s later
+    // playSweep() call (from the rAF loop, not a gesture) can get silently
+    // blocked by the browser's autoplay policy for that entire run.
+    getBonusAudioContext();
+    jump(state);
+  };
   const onKeydown = (event) => {
     if (event.code === 'Space' || event.key === ' ') {
       event.preventDefault();
