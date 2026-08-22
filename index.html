@@ -92,6 +92,8 @@
         <button id="btn-start-game" type="button" class="btn btn--primary">Start Game</button>
         <button id="btn-next-question" type="button" class="btn btn--secondary" disabled>Next Question</button>
         <button id="btn-end-session" type="button" class="btn btn--ghost" disabled>Finalizar sesión</button>
+        <button id="btn-start-bonus" type="button" class="btn btn--primary" disabled>Start Bonus Round</button>
+        <button id="btn-end-bonus" type="button" class="btn btn--ghost" disabled>Finalizar ronda bonus</button>
         <button id="btn-reset-game" type="button" class="btn btn--ghost">Reset</button>
       </div>
 
@@ -126,6 +128,11 @@
       <div id="board-leaderboard" class="board-leaderboard" aria-label="Round leaderboard" hidden></div>
 
       <div id="board-final-ranking" class="board-leaderboard board-final-ranking" aria-label="Final session ranking" hidden></div>
+
+      <!-- Husky Bonus Round: live leaderboard (BONUS_ROUND) and champion
+           reveal (BONUS_RESULTS) share this one panel — see
+           renderBonusLeaderboard()/renderBonusChampionReveal() in app.js. -->
+      <div id="board-bonus-leaderboard" class="board-leaderboard board-bonus-leaderboard" aria-label="Bonus round leaderboard" hidden></div>
 
       <div id="board-roster" class="board-roster" aria-label="Connected students"></div>
     </section>

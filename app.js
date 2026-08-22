@@ -710,11 +710,6 @@ function renderDashboard() {
   const btnNext = document.getElementById('btn-next-question');
   const btnSimulator = document.getElementById('btn-toggle-simulator');
   const btnEndSession = document.getElementById('btn-end-session');
-  // #btn-start-bonus / #btn-end-bonus don't exist in index.html yet — that
-  // markup lands in PR 4 (openspec/changes/husky-bonus-round/tasks.md 4.1).
-  // Looked up defensively here, same null-safe idiom as every other control
-  // on this dashboard, so the wiring is already correct the moment PR 4
-  // adds the elements.
   const btnStartBonus = document.getElementById('btn-start-bonus');
   const btnEndBonus = document.getElementById('btn-end-bonus');
   const boardTrack = document.getElementById('board-track');
@@ -762,6 +757,8 @@ function renderDashboard() {
 
   renderLeaderboardPanel();
   renderFinalRankingPanel();
+  renderBonusLeaderboard();
+  renderBonusChampionReveal();
 }
 
 /**
@@ -836,6 +833,125 @@ function renderFinalRankingPanel() {
   gameState.finalRanking.forEach((entry, index) => {
     const item = document.createElement('li');
     const prefix = index === 0 ? '\u{1F3C6} ' : '';
+    item.textContent = `${prefix}${entry.studentId} — ${entry.score} pts`;
+    list.appendChild(item);
+  });
+  panel.appendChild(list);
+}
+
+/**
+ * Renders (or hides, outside BONUS_ROUND) the live Husky Bonus Round
+ * leaderboard: each finalist's current score, sorted descending, with
+ * stalled finalists visibly dimmed and labeled but still counted (their
+ * score is frozen, not removed). Re-renders on every `BONUS_SCORE` (see
+ * `handleHostMessage()`) and every stall-check tick (see
+ * `startBonusStallCheck()`), both of which call `renderDashboard()`.
+ *
+ * Shares its DOM panel (`#board-bonus-leaderboard`) with
+ * `renderBonusChampionReveal()` below. `BONUS_ROUND` and `BONUS_RESULTS`
+ * are mutually exclusive states, so ownership is split cleanly: this
+ * function renders when `current === BONUS_ROUND`, no-ops (leaves the
+ * panel alone) when `current === BONUS_RESULTS` so it doesn't clobber the
+ * champion reveal, and hides/clears the panel for every other state. Call
+ * order between the two functions in `renderDashboard()` doesn't matter as
+ * a result — each only ever touches the panel for its own state.
+ * @satisfies specs/bonus-round/spec.md — Live Host Leaderboard, Stalled Finalist Handling
+ */
+function renderBonusLeaderboard() {
+  const panel = document.getElementById('board-bonus-leaderboard');
+  if (!panel) return;
+
+  if (gameState.current === GAME_STATES.BONUS_RESULTS) return; // owned by renderBonusChampionReveal()
+
+  if (gameState.current !== GAME_STATES.BONUS_ROUND) {
+    panel.hidden = true;
+    panel.removeAttribute('data-phase');
+    panel.innerHTML = '';
+    return;
+  }
+
+  panel.hidden = false;
+  panel.dataset.phase = 'live';
+  panel.innerHTML = '';
+
+  const heading = document.createElement('h2');
+  heading.className = 'panel__title';
+  heading.textContent = 'Bonus Round — Live';
+  panel.appendChild(heading);
+
+  if (gameState.bonusFinalists.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'leaderboard__empty';
+    empty.textContent = 'No finalists.';
+    panel.appendChild(empty);
+    return;
+  }
+
+  const standings = gameState.bonusFinalists
+    .map((studentId) => ({
+      studentId,
+      ...(gameState.bonusScores[studentId] || { score: 0, alive: true, stalled: false }),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const list = document.createElement('ol');
+  list.className = 'leaderboard__list';
+  standings.forEach((entry) => {
+    const item = document.createElement('li');
+    item.className = 'bonus-leaderboard__item';
+    item.dataset.stalled = String(!!entry.stalled);
+    item.textContent = entry.stalled
+      ? `${entry.studentId} — ${entry.score} pts (stalled)`
+      : `${entry.studentId} — ${entry.score} pts`;
+    list.appendChild(item);
+  });
+  panel.appendChild(list);
+}
+
+/**
+ * Renders (or hides, outside BONUS_RESULTS) the champion-reveal screen once
+ * `endBonusRound()` has populated `gameState.bonusStandings`/`bonusChampions`:
+ * the champion name(s) — supports co-champions on a tie, per the spec — and
+ * the final standings, reusing `.leaderboard__list`/`.panel__title`.
+ *
+ * Shares `#board-bonus-leaderboard` with `renderBonusLeaderboard()` above;
+ * see that function's header comment for the ownership split.
+ * @satisfies specs/bonus-round/spec.md — Champion Reveal
+ */
+function renderBonusChampionReveal() {
+  const panel = document.getElementById('board-bonus-leaderboard');
+  if (!panel) return;
+
+  if (gameState.current !== GAME_STATES.BONUS_RESULTS) return; // owned by renderBonusLeaderboard()
+
+  panel.hidden = false;
+  panel.dataset.phase = 'results';
+  panel.innerHTML = '';
+
+  const heading = document.createElement('h2');
+  heading.className = 'panel__title';
+  heading.textContent = gameState.bonusChampions.length > 1 ? '\u{1F3C6} Co-Champions!' : '\u{1F3C6} Champion!';
+  panel.appendChild(heading);
+
+  const champLine = document.createElement('p');
+  champLine.className = 'bonus-champion__names';
+  champLine.textContent =
+    gameState.bonusChampions.length > 0 ? gameState.bonusChampions.join('  •  ') : 'No finalist scored.';
+  panel.appendChild(champLine);
+
+  if (gameState.bonusStandings.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'leaderboard__empty';
+    empty.textContent = 'No standings recorded.';
+    panel.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('ol');
+  list.className = 'leaderboard__list';
+  gameState.bonusStandings.forEach((entry) => {
+    const item = document.createElement('li');
+    const prefix = gameState.bonusChampions.includes(entry.studentId) ? '\u{1F3C6} ' : '';
     item.textContent = `${prefix}${entry.studentId} — ${entry.score} pts`;
     list.appendChild(item);
   });
@@ -1094,7 +1210,6 @@ function initDashboardControls() {
   const btnReset = document.getElementById('btn-reset-game');
   const btnSimulator = document.getElementById('btn-toggle-simulator');
   const btnEndSession = document.getElementById('btn-end-session');
-  // See renderDashboard()'s matching lookup — these elements arrive in PR 4.
   const btnStartBonus = document.getElementById('btn-start-bonus');
   const btnEndBonus = document.getElementById('btn-end-bonus');
   const selectCorrectAnswer = document.getElementById('input-correct-answer');
@@ -1442,7 +1557,7 @@ function handleHostMessage(message) {
       // they're back.
       entry.stalled = false;
       gameState.bonusLastSeen[studentId] = Date.now();
-      renderDashboard(); // PR 4's renderBonusLeaderboard() re-renders from here once it exists
+      renderDashboard(); // re-renders renderBonusLeaderboard() with the updated score
       checkBonusRoundFinalization();
       break;
     }

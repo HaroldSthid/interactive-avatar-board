@@ -565,6 +565,51 @@ button {
   min-height: 40px;
 }
 
+/* Husky Bonus Round: live leaderboard (BONUS_ROUND) and champion reveal
+   (BONUS_RESULTS) share the same panel — see
+   renderBonusLeaderboard()/renderBonusChampionReveal() in app.js. Magenta
+   pulse while live (visually distinct from the round leaderboard's cyan
+   pulse and the final-ranking panel's static gold border); swaps to a
+   static gold pulse once [data-phase='results'] marks the round finalized,
+   deliberately echoing the SESSION_END gold family since "we have a
+   champion" reads the same as "the session is over". */
+.board-bonus-leaderboard {
+  border-color: var(--color-neon-magenta);
+  animation: pulse-glow-magenta 2.4s ease-in-out infinite;
+}
+
+.board-bonus-leaderboard .panel__title {
+  margin-bottom: var(--spacing-sm);
+}
+
+.board-bonus-leaderboard[data-phase='results'] {
+  border-color: var(--color-neon-yellow);
+  animation: pulse-glow-gold 2s ease-in-out infinite;
+}
+
+.board-bonus-leaderboard[data-phase='results'] .panel__title {
+  color: var(--color-neon-yellow);
+}
+
+/* Stalled finalists (spec: Stalled Finalist Handling) stay in the list —
+   their frozen score still counts — but read as visibly inactive next to
+   still-playing finalists. The "(stalled)" label itself is set in the
+   element's textContent in app.js, not via ::after, so it isn't lost to
+   screen readers that ignore generated content. */
+.bonus-leaderboard__item[data-stalled='true'] {
+  color: var(--color-text-muted);
+  opacity: 0.65;
+}
+
+.bonus-champion__names {
+  margin: 0 0 var(--spacing-sm);
+  font-size: 1.4em;
+  font-weight: 700;
+  color: var(--color-neon-yellow);
+  text-shadow: 0 0 6px rgba(247, 255, 0, 0.6);
+  text-align: center;
+}
+
 /* ==========================================================================
    Controller view: student answer submission
    ========================================================================== */
@@ -638,6 +683,16 @@ button {
   }
   50% {
     box-shadow: 0 0 4px rgba(0, 240, 255, 0.4), 0 0 10px rgba(0, 240, 255, 0.15);
+  }
+}
+
+@keyframes pulse-glow-magenta {
+  0%,
+  100% {
+    box-shadow: var(--shadow-neon-magenta);
+  }
+  50% {
+    box-shadow: 0 0 4px rgba(255, 0, 200, 0.4), 0 0 10px rgba(255, 0, 200, 0.15);
   }
 }
 

@@ -178,35 +178,37 @@ Rationale: per `design.md` "Honest sizing" — this is the largest net-new piece
 
 ## Phase 4: Host Leaderboard + Champion-Reveal UI (PR 4)
 
-- [ ] 4.1 Add `#board-bonus-leaderboard` panel and `#btn-start-bonus`/`#btn-end-bonus` controls to `index.html` board view.
+- [x] 4.1 Add `#board-bonus-leaderboard` panel and `#btn-start-bonus`/`#btn-end-bonus` controls to `index.html` board view.
   - Satisfies: `design.md` §7 File Changes (index.html board view)
   - Depends on: 3.5, 3.10
   - Parallelizable: yes
 
-- [ ] 4.2 Implement `renderBonusLeaderboard()` in `app.js`: finalist list sorted descending by score, stalled indicator; called from `renderDashboard()` gated on `gameState.current === BONUS_ROUND`.
+- [x] 4.2 Implement `renderBonusLeaderboard()` in `app.js`: finalist list sorted descending by score, stalled indicator; called from `renderDashboard()` gated on `gameState.current === BONUS_ROUND`.
   - Satisfies: `specs/bonus-round/spec.md` — Live Host Leaderboard
   - Depends on: 3.6, 4.1
   - Parallelizable: no
 
-- [ ] 4.3 Implement champion-reveal render (supports co-champions) in `app.js`, called from `renderDashboard()` gated on `gameState.current === BONUS_RESULTS`, reusing `.leaderboard__list`/`.panel__title` classes.
+- [x] 4.3 Implement champion-reveal render (supports co-champions) in `app.js`, called from `renderDashboard()` gated on `gameState.current === BONUS_RESULTS`, reusing `.leaderboard__list`/`.panel__title` classes.
   - Satisfies: `specs/bonus-round/spec.md` — Champion Reveal
   - Depends on: 3.9, 4.1
   - Parallelizable: no
+  - **Note**: `renderBonusLeaderboard()` and `renderBonusChampionReveal()` share the single `#board-bonus-leaderboard` panel (per 4.1's one-panel scope) rather than two separate panel elements. Since `BONUS_ROUND`/`BONUS_RESULTS` are mutually exclusive, each function only renders (and only hides/clears) for its own state and no-ops otherwise — see the header comment on `renderBonusLeaderboard()` in `app.js` for the exact ownership split.
 
-- [ ] 4.4 Add `renderDashboard()` guards for `BONUS_ROUND`/`BONUS_RESULTS` (`app.js:672`).
+- [x] 4.4 Add `renderDashboard()` guards for `BONUS_ROUND`/`BONUS_RESULTS` (`app.js:672`).
   - Satisfies: `design.md` §2 Decision 6 (state-gated rendering idiom)
   - Depends on: 4.2, 4.3
   - Parallelizable: no
 
-- [ ] 4.5 Add `style.css` rules for the bonus leaderboard panel and champion-reveal screen.
+- [x] 4.5 Add `style.css` rules for the bonus leaderboard panel and champion-reveal screen.
   - Satisfies: `design.md` §7 File Changes (style.css)
   - Depends on: 4.1
   - Parallelizable: yes
 
-- [ ] 4.6 Manual verification: force two identical `BONUS_SCORE` payloads via devtools; confirm `BONUS_END.champions` carries both and both names render on the reveal.
+- [x] 4.6 Manual verification: force two identical `BONUS_SCORE` payloads via devtools; confirm `BONUS_END.champions` carries both and both names render on the reveal.
   - Satisfies: `design.md` §8 Testing Strategy — Co-champions layer
   - Depends on: 4.4, 4.5
   - Parallelizable: no
+  - **Verification method**: no browser/devtools available in this environment (same constraint as PR 2's 2.5 and PR 3's 3.12). Verified instead via a Node `vm`-sandboxed run of the actual `app.js` (stubbed `document`/`window`, minimal DOM-element mock with `dataset`/`hidden`/`appendChild`/`textContent`), directly driving `renderBonusLeaderboard()`/`renderBonusChampionReveal()`: (1) `BONUS_ROUND` with 3 finalists renders sorted descending by score (120, 80, 50) with the stalled finalist (s2) getting `dataset.stalled === 'true'` and a "(stalled)" suffix, the non-stalled/dead finalist (s3) getting `dataset.stalled === 'false'`; (2) `BONUS_RESULTS` with a single champion renders `🏆 Champion!`, the champion's name, and a trophy-prefixed standings list; (3) forcing a tie (`bonusChampions: ['s2','s4']` on identical scores, mirroring the devtools-forced-tie scenario this task describes) renders `🏆 Co-Champions!` with both names in the champion line and both entries trophy-prefixed in standings; (4) an unrelated state (`SESSION_END`) hides and clears the panel. All assertions matched expected values — see conversation history for full script output.
 
 ---
 
