@@ -115,4 +115,9 @@ const QUESTIONS_PUBLIC = [
     text: '¿Cuánto es la mitad de 90?',
     options: { A: '40', B: '45', C: '35', D: '50' },
   },
+  {
+    id: 21,
+    text: 'PRUEBA GENERADOR: ¿qué archivo hay que editar para cambiar las preguntas?',
+    options: { A: 'app.js', B: 'questions-source.json', C: 'answers.json', D: 'index.html' },
+  },
 ];
