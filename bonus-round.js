@@ -263,6 +263,11 @@ function die(state) {
     cancelAnimationFrame(state.rafId);
   }
   state.rafId = null;
+  // The run is over the moment we die — don't wait for the caller's later
+  // stop() (app.js only calls it once BONUS_END arrives from the host) to
+  // release the keydown/click/visibilitychange listeners and the closure
+  // they hold (onScore/onEnd included).
+  detachInputHandlers(state);
   playSweep(180, 70, 0.25, 'sawtooth', 0.22); // low, dry thud
   if (typeof state.onEnd === 'function') state.onEnd(state.score);
 }
