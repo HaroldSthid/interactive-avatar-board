@@ -115,4 +115,29 @@ const QUESTIONS_PUBLIC = [
     text: '¿Cuánto es la mitad de 90?',
     options: { A: '40', B: '45', C: '35', D: '50' },
   },
+  {
+    id: 21,
+    text: '¿Qué es una variable en programación?',
+    options: { A: 'Un tipo de bucle.', B: 'Un espacio en memoria para guardar un valor.', C: 'Un error de sintaxis.', D: 'Un archivo de imagen.' },
+  },
+  {
+    id: 22,
+    text: '¿Para qué sirve un bucle (loop) como "for" o "while"?',
+    options: { A: 'Para repetir una acción varias veces.', B: 'Para borrar archivos.', C: 'Para conectar a internet.', D: 'Para diseñar una página web.' },
+  },
+  {
+    id: 23,
+    text: '¿Qué es un algoritmo?',
+    options: { A: 'Un lenguaje de programación.', B: 'Una serie de pasos ordenados para resolver un problema.', C: 'Un tipo de base de datos.', D: 'Un dispositivo de hardware.' },
+  },
+  {
+    id: 24,
+    text: '¿Cuál es el resultado de 5 % 2 (operador módulo) en la mayoría de los lenguajes?',
+    options: { A: '2', B: '2.5', C: '1', D: '0' },
+  },
+  {
+    id: 25,
+    text: '¿Qué estructura de datos funciona como una pila de platos, donde el último que entra es el primero en salir?',
+    options: { A: 'Cola (Queue)', B: 'Pila (Stack)', C: 'Árbol (Tree)', D: 'Grafo (Graph)' },
+  },
 ];
