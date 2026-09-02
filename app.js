@@ -1275,6 +1275,34 @@ const CONTROL_TYPES = {
   ERROR: 'ERROR',
 };
 
+// The relay server only ever inspects `.type` (design.md — no game-logic
+// validation in relay.js), so any socket that speaks the wire protocol
+// directly (bypassing the join form entirely) can hand handleHostMessage()
+// an arbitrary payload. studentId/choice/avatarImage all end up either in a
+// DOM selector (syncAvatarTokens, moveAvatarToken) or a CSS url() string
+// (avatar token background-image), so they're validated here, at the
+// trust boundary, before anything downstream sees them.
+const STUDENT_ID_MAX_LENGTH = 40;
+const STUDENT_ID_PATTERN = /^[\p{L}\p{N} _.'-]+$/u;
+
+function isValidStudentId(studentId) {
+  return (
+    typeof studentId === 'string' &&
+    studentId.length > 0 &&
+    studentId.length <= STUDENT_ID_MAX_LENGTH &&
+    STUDENT_ID_PATTERN.test(studentId)
+  );
+}
+
+function isValidAvatarImage(avatarImage) {
+  if (avatarImage === undefined || avatarImage === null) return true;
+  return (
+    typeof avatarImage === 'string' &&
+    avatarImage.startsWith('data:image/') &&
+    estimateDataUrlBytes(avatarImage) <= AVATAR_RESULT_MAX_BYTES
+  );
+}
+
 const HOST_ID_RETRY_LIMIT = 5;
 
 // Per-question countdown duration — a single named constant so it's trivial
@@ -1530,13 +1558,15 @@ function handleHostMessage(message) {
   switch (message.type) {
     case MSG_TYPES.JOIN: {
       const { studentId, avatar, avatarImage } = message.payload || {};
-      if (!studentId) return;
+      if (!isValidStudentId(studentId)) return;
+      if (avatar !== undefined && !MOCK_AVATARS.includes(avatar)) return;
+      if (!isValidAvatarImage(avatarImage)) return;
       registerRealStudent(studentId, avatar, avatarImage);
       break;
     }
     case MSG_TYPES.SUBMIT: {
       const { studentId, choice, timeElapsedMs } = message.payload || {};
-      if (!studentId || !choice) return;
+      if (!isValidStudentId(studentId) || !QUADRANTS.includes(choice)) return;
       const timestamp = (gameState.questionStartedAt || Date.now()) + (timeElapsedMs || 0);
       recordSubmission(studentId, choice, timestamp);
       break;
