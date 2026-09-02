@@ -6,6 +6,12 @@
 const IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours since last frame
 const HOST_DISCONNECT_CODE = 4001;
 
+// Unauthenticated HELLOs can otherwise grow `rooms`/a room's student list
+// without bound (a live class is at most a few dozen students) — these caps
+// bound worst-case memory and per-message broadcast fan-out.
+const MAX_ROOMS = 100;
+const MAX_STUDENTS_PER_ROOM = 60;
+
 /** @type {Map<string, { hostSocket: import('ws').WebSocket, students: Map<import('ws').WebSocket, true>, lastSeenAt: number }>} */
 const rooms = new Map();
 
@@ -28,6 +34,9 @@ export function createRoom(roomId, hostSocket) {
   if (rooms.has(roomId)) {
     return { ok: false, error: 'ROOM_TAKEN' };
   }
+  if (rooms.size >= MAX_ROOMS) {
+    return { ok: false, error: 'SERVER_FULL' };
+  }
 
   rooms.set(roomId, {
     hostSocket,
@@ -47,6 +56,9 @@ export function joinRoom(roomId, studentSocket) {
   const room = rooms.get(roomId);
   if (!room) {
     return { ok: false, error: 'ROOM_NOT_FOUND' };
+  }
+  if (room.students.size >= MAX_STUDENTS_PER_ROOM) {
+    return { ok: false, error: 'ROOM_FULL' };
   }
 
   room.students.set(studentSocket, true);

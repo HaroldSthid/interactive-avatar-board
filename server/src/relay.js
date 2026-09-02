@@ -14,12 +14,14 @@ function sendError(socket, code) {
   send(socket, { type: 'ERROR', payload: { code } });
 }
 
+const MAX_ROOM_ID_LENGTH = 64; // generous bound — real Room IDs are the short generateRoomId() format
+
 function handleHello(socket, payload) {
   const role = payload && payload.role;
   const roomId = payload && payload.roomId;
 
   const validRole = role === 'host' || role === 'student';
-  const validRoomId = typeof roomId === 'string' && roomId.length > 0;
+  const validRoomId = typeof roomId === 'string' && roomId.length > 0 && roomId.length <= MAX_ROOM_ID_LENGTH;
 
   if (!validRole || !validRoomId) {
     sendError(socket, 'BAD_HELLO');

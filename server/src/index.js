@@ -1,13 +1,18 @@
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { handleConnection } from './relay.js';
-import { dropSocket, sweepIdle } from './rooms.js';
+import { dropSocket, sweepIdle, getSocketInfo } from './rooms.js';
 
 const PORT = process.env.PORT || 8080;
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
 
 const SELF_PING_INTERVAL_MS = 10 * 60_000; // 10 minutes
 const LIVENESS_SWEEP_INTERVAL_MS = 30_000; // 30 seconds
+// A socket that keeps answering pings but never sends HELLO is invisible to
+// both the liveness sweep (only drops failed-pong sockets) and sweepIdle
+// (only iterates registered rooms) — it would otherwise sit in wss.clients
+// forever. Give it a short window to register.
+const HELLO_TIMEOUT_MS = 10_000; // 10 seconds
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
@@ -27,6 +32,13 @@ wss.on('connection', (socket) => {
   socket.on('pong', () => {
     socket.isAlive = true;
   });
+
+  const helloTimer = setTimeout(() => {
+    if (!getSocketInfo(socket)) {
+      socket.terminate();
+    }
+  }, HELLO_TIMEOUT_MS);
+  socket.on('close', () => clearTimeout(helloTimer));
 
   handleConnection(socket);
 });
