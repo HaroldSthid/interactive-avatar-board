@@ -2,6 +2,9 @@
 
 /**
  * Interactive Avatar Board — questions-public.js
+ * GENERATED FILE — do not edit by hand. Edit questions-source.json and run
+ * `node scripts/generate-questions.mjs` instead (see README.md).
+ *
  * Pre-configured question bank (PUBLIC part). Loaded before app.js (see
  * index.html) into EVERY visitor's browser (host and students alike).
  *
@@ -10,14 +13,6 @@
  * host's code path, only once hosting actually starts (see initHostPeer()
  * in app.js). See README.md for why this is split and what it does/doesn't
  * protect against.
- *
- * Edit this array to adapt the demo to your own class: each item needs an
- * `id`, a `text` (the question shown to students), and an `options` object
- * with A/B/C/D answer text. The `id` here MUST match the `id` key you use
- * in answers.json for the same question.
- * app.js cycles through QUESTIONS_PUBLIC in order (wrapping back to the
- * start) each time the host starts a new round — no other code changes are
- * required.
  */
 const QUESTIONS_PUBLIC = [
   {

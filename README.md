@@ -48,42 +48,34 @@ Al terminar el quiz, el docente puede lanzar una **ronda extra de habilidad** pa
 
 ## Cómo editar el banco de preguntas
 
-Las preguntas están divididas en **dos archivos** que hay que editar juntos:
+Las preguntas se editan en **un solo archivo**, `questions-source.json` — pregunta, opciones A-D y respuesta correcta juntos, todo en el mismo lugar:
 
-- **`questions-public.js`** — array `QUESTIONS_PUBLIC`, con el `id`, el `text` (enunciado) y las `options` (A/B/C/D) de cada pregunta. Este archivo se carga en el navegador de **todos** — docente y estudiantes — apenas se abre la app.
-- **`answers.json`** — objeto plano que mapea cada `id` de pregunta a su respuesta correcta, por ejemplo `{"1": "B", "2": "C", ...}`. Este archivo **no** se carga automáticamente para nadie: solo se pide (`fetch`) desde el navegador del docente, y recién en el momento en que hace click en "Start Hosting".
+```json
+{
+  "id": 9,
+  "text": "¿Cuál es la capital de Francia?",
+  "options": { "A": "Madrid", "B": "París", "C": "Roma", "D": "Berlín" },
+  "correctAnswer": "B"
+}
+```
 
-### ¿Por qué está separado?
+Después de editar `questions-source.json`, corré:
 
-Antes, `questions.js` tenía todo junto (pregunta + respuesta correcta) y se cargaba en el navegador de cada estudiante apenas abría la app — cualquiera que abriera la consola del navegador podía ver todas las respuestas correctas de antemano. Separando la respuesta correcta en `answers.json`, y pidiéndola solo desde el código del docente, evitamos esa exposición casual/automática por defecto.
+```bash
+node scripts/generate-questions.mjs
+```
 
-**Ojo:** esto es una mitigación, no seguridad real. Como es un sitio 100% estático sin backend, no hay forma de ocultarle un archivo a alguien que sepa pedirlo directamente por URL (por ejemplo, un estudiante técnicamente decidido podría igual entrar a `.../answers.json` a mano, o ver el archivo si tiene acceso al dispositivo que hostea). Si el docente necesita una garantía real de que las respuestas no se puedan ver, hace falta un backend — eso queda fuera del alcance de este proyecto.
+Esto regenera `questions-public.js` y `answers.json` a partir de la fuente, validando de paso que no haya `id` duplicados, que las 4 opciones estén completas y que `correctAnswer` sea A/B/C/D — si algo está mal, el script corta con un mensaje señalando la pregunta exacta, en vez de dejarte con los dos archivos desincronizados.
 
-### Cómo agregar o cambiar una pregunta
+**`questions-public.js`** y **`answers.json`** ahora son **archivos generados** (dice "GENERATED FILE" en el header de `questions-public.js`) — no hace falta editarlos a mano, y si lo hacés, el próximo `generate-questions.mjs` los va a pisar.
 
-Hay que editar **los dos archivos**, usando el **mismo `id`** en ambos:
+### ¿Por qué siguen siendo dos archivos separados?
 
-1. En `questions-public.js`, agregá o editá el item dentro de `QUESTIONS_PUBLIC`:
+`questions-public.js` (con el enunciado y las opciones) se carga en el navegador de **todos** — docente y estudiantes — apenas se abre la app. `answers.json` (con la respuesta correcta) **no** se carga automáticamente para nadie: solo se pide (`fetch`) desde el navegador del docente, recién al hacer click en "Start Hosting". Separar la respuesta correcta evita que cualquiera que abra la consola del navegador vea todas las respuestas de antemano.
 
-   ```js
-   {
-     id: 9,
-     text: "¿Cuál es la capital de Francia?",
-     options: { A: "Madrid", B: "París", C: "Roma", D: "Berlín" },
-   }
-   ```
+**Ojo:** esto sigue siendo una mitigación, no seguridad real. Como es un sitio 100% estático sin backend, no hay forma de ocultarle un archivo a alguien que sepa pedirlo directamente por URL (un estudiante técnicamente decidido podría igual entrar a `.../answers.json` a mano). El generador no cambia esa garantía — solo evita que la separación se rompa por un error de tipeo al mantener los dos archivos a mano. Si el docente necesita una garantía real de que las respuestas no se puedan ver, hace falta un backend — eso queda fuera del alcance de este proyecto.
 
-2. En `answers.json`, agregá o editá la entrada correspondiente **con el mismo `id`** (como string, porque es una clave JSON):
-
-   ```json
-   {
-     "9": "B"
-   }
-   ```
-
-3. Si el `id` no coincide entre los dos archivos, esa pregunta no va a tener respuesta correcta cargada automáticamente (el dropdown "Correct Answer" del panel del docente queda vacío para esa ronda, pero se puede elegir a mano igual).
-
-El juego arranca con **20 preguntas de ejemplo**. El orden es **aleatorio** (no repite ninguna hasta usar las 20), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas que quieras siguiendo el mismo formato, sin tocar `app.js`.
+El juego arranca con **20 preguntas de ejemplo**. El orden es **aleatorio** (no repite ninguna hasta usar las 20), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas que quieras en `questions-source.json` siguiendo el mismo formato, sin tocar `app.js`.
 
 ## Limitaciones conocidas
 
