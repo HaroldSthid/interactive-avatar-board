@@ -75,7 +75,7 @@ Esto regenera `questions-public.js` y `answers.json` a partir de la fuente, vali
 
 **Ojo:** esto sigue siendo una mitigación, no seguridad real. Como es un sitio 100% estático sin backend, no hay forma de ocultarle un archivo a alguien que sepa pedirlo directamente por URL (un estudiante técnicamente decidido podría igual entrar a `.../answers.json` a mano). El generador no cambia esa garantía — solo evita que la separación se rompa por un error de tipeo al mantener los dos archivos a mano. Si el docente necesita una garantía real de que las respuestas no se puedan ver, hace falta un backend — eso queda fuera del alcance de este proyecto.
 
-El juego arranca con **20 preguntas de ejemplo**. El orden es **aleatorio** (no repite ninguna hasta usar las 20), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas que quieras en `questions-source.json` siguiendo el mismo formato, sin tocar `app.js`.
+El juego arranca con **25 preguntas de ejemplo** (programación básica, SCRUM y cultura general). El orden es **aleatorio** (no repite ninguna hasta usar las 25), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas que quieras en `questions-source.json` siguiendo el mismo formato, sin tocar `app.js`.
 
 ## Limitaciones conocidas
 
