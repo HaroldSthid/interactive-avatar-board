@@ -5,18 +5,18 @@
     "options": {
       "A": "Dióxido de carbono",
       "B": "Nitrógeno",
-      "C": "Oxígeno",
-      "D": "Hidrógeno"
+      "C": "Hidrógeno",
+      "D": "Oxígeno"
     }
   },
   {
     "id": 12,
     "text": "¿Cuál es el resultado de la raíz cuadrada de 81?",
     "options": {
-      "A": "7",
-      "B": "8",
-      "C": "9",
-      "D": "10"
+      "A": "9",
+      "B": "10",
+      "C": "11",
+      "D": "12"
     }
   },
   {
@@ -24,8 +24,8 @@
     "text": "¿Quién pintó la Mona Lisa?",
     "options": {
       "A": "Pablo Picasso",
-      "B": "Leonardo da Vinci",
-      "C": "Vincent van Gogh",
+      "B": "Vincent van Gogh",
+      "C": "Leonardo da Vinci",
       "D": "Miguel Ángel"
     }
   },
@@ -34,8 +34,8 @@
     "text": "¿Cuál es el océano más grande del mundo?",
     "options": {
       "A": "Atlántico",
-      "B": "Índico",
-      "C": "Pacífico",
+      "B": "Pacífico",
+      "C": "Índico",
       "D": "Ártico"
     }
   },
@@ -43,10 +43,10 @@
     "id": 15,
     "text": "¿Cuánto es 12 x 6?",
     "options": {
-      "A": "66",
-      "B": "72",
-      "C": "78",
-      "D": "84"
+      "A": "60",
+      "B": "66",
+      "C": "70",
+      "D": "72"
     }
   },
   {
@@ -64,8 +64,8 @@
     "text": "¿Cuál es el hueso más largo del cuerpo humano?",
     "options": {
       "A": "Húmero",
-      "B": "Fémur",
-      "C": "Tibia",
+      "B": "Tibia",
+      "C": "Fémur",
       "D": "Radio"
     }
   },
@@ -74,8 +74,8 @@
     "text": "¿En qué continente está Egipto?",
     "options": {
       "A": "Asia",
-      "B": "Europa",
-      "C": "África",
+      "B": "África",
+      "C": "Europa",
       "D": "Oceanía"
     }
   },
@@ -83,19 +83,19 @@
     "id": 19,
     "text": "¿Cuál es el resultado de 15 - 7?",
     "options": {
-      "A": "6",
-      "B": "7",
-      "C": "8",
-      "D": "9"
+      "A": "5",
+      "B": "6",
+      "C": "7",
+      "D": "8"
     }
   },
   {
     "id": 20,
     "text": "¿Cuál es la moneda oficial de Japón?",
     "options": {
-      "A": "Yuan",
-      "B": "Won",
-      "C": "Yen",
+      "A": "Yen",
+      "B": "Yuan",
+      "C": "Won",
       "D": "Ringgit"
     }
   },
@@ -104,8 +104,8 @@
     "text": "¿Qué planeta es conocido como el planeta rojo?",
     "options": {
       "A": "Venus",
-      "B": "Marte",
-      "C": "Júpiter",
+      "B": "Júpiter",
+      "C": "Marte",
       "D": "Saturno"
     }
   },
@@ -121,20 +121,20 @@
   },
   {
     "id": 23,
-    "text": "¿Quién fue el primer presidente de Argentina?",
+    "text": "¿Cuál es la capital de Argentina?",
     "options": {
-      "A": "Bernardino Rivadavia",
-      "B": "Domingo Sarmiento",
-      "C": "Julio A. Roca",
-      "D": "Justo José de Urquiza"
+      "A": "Córdoba",
+      "B": "Mar del Plata",
+      "C": "Buenos Aires",
+      "D": "Santa Fe"
     }
   },
   {
     "id": 24,
     "text": "¿Cuál es el metal líquido a temperatura ambiente?",
     "options": {
-      "A": "Hierro",
-      "B": "Mercurio",
+      "A": "Mercurio",
+      "B": "Hierro",
       "C": "Aluminio",
       "D": "Plomo"
     }
@@ -145,8 +145,8 @@
     "options": {
       "A": "40",
       "B": "45",
-      "C": "35",
-      "D": "50"
+      "C": "50",
+      "D": "55"
     }
   }
 ]

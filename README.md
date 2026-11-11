@@ -77,7 +77,7 @@ Al terminar el quiz, el docente puede lanzar una **ronda extra de habilidad** pa
 
 ## Cómo editar el banco de preguntas
 
-Las preguntas se organizan **por tema**: hay un archivo por tema en la carpeta `questions/` (hoy `scrum.json`, `programacion.json` y `cultura-general.json`). Cada archivo tiene el `id` del tema (solo minúsculas, números y guiones), su `title` y la lista de preguntas — pregunta, opciones A-D y respuesta correcta juntos, todo en el mismo lugar:
+Las preguntas se organizan **por tema**: hay un archivo por tema en la carpeta `questions/` (hoy `scrum.json`, `programacion.json` —"Fundamentos de programación"— y `cultura-general.json`). Cada archivo tiene el `id` del tema (solo minúsculas, números y guiones), su `title` y la lista de preguntas — pregunta, opciones A-D y respuesta correcta juntos, todo en el mismo lugar:
 
 ```json
 {
@@ -106,6 +106,18 @@ Esto regenera la carpeta `banks/` a partir de las fuentes, validando de paso que
 
 **`banks/`** es una carpeta **generada** (tiene un `README.md` que lo avisa) — no hace falta editarla a mano, y si lo hacés, el próximo `generate-questions.mjs` la reconstruye de cero. Contiene `index.json` (la lista de temas con su cantidad de preguntas) y, por tema, `<tema>.questions.json` (enunciados y opciones, sin respuestas) y `<tema>.answers.json` (las respuestas).
 
+### Cómo redactar buenas preguntas
+
+El quiz sirve para **repasar vocabulario y distinguir términos parecidos** (por ejemplo, *Sprint*, *Sprint Planning* y *Sprint Review* no son lo mismo), no para tender trampas. Algunas pautas:
+
+- **Distinguí hermanos:** los distractores tienen que ser los términos que se confunden con la respuesta correcta (si la respuesta es *Sprint Review*, las otras opciones son *Sprint Planning*, *Sprint Retrospective* y *Daily Scrum*), no opciones absurdas.
+- **Variá la dirección:** definición → término ("¿Qué reunión sirve para planificar el Sprint?"), término → definición ("¿Qué es el Sprint Backlog?") y rol → responsabilidad.
+- **Enunciados cortos y palabras simples**, sin jerga más allá del término que se está evaluando. Una sola respuesta claramente correcta y ninguna opción tipo "todas las anteriores".
+- **Opciones de largo parecido y gramática paralela**, para que el largo no delate la respuesta. En las numéricas, ordenalas de menor a mayor.
+- **Balanceá las letras:** que la respuesta correcta caiga en A, B, C y D más o menos por igual (cerca del 25% cada una) y que no se repita la misma letra tres veces seguidas.
+
+Al correr `node scripts/generate-questions.mjs` se imprime una **tabla de distribución** por tema y para el modo mixto, y aparecen `WARNING` (no frenan la generación) si alguna letra queda fuera del 15%-35%, si la opción correcta es la más larga en más del 40% de las preguntas de un tema, o si hay 3 o más respuestas seguidas con la misma letra. Lo ideal es que no aparezca ninguno.
+
 ### Elegir el tema al armar la sala
 
 En el formulario **"Host a Board"**, antes de clickear "Start Hosting", elegí el tema en el selector **"Question topic"**: un tema puntual o **"All topics (mixed)"**, que mezcla todos (por defecto, o el último que elegiste: se recuerda en el navegador del host). El tema se bloquea cuando la sala está creada, y se muestra en el board junto al Room ID. Si no se pueden cargar las preguntas, se muestra un error y no se crea la sala.
@@ -118,7 +130,7 @@ Los enunciados y opciones (`<tema>.questions.json`) y las respuestas correctas (
 
 **Ojo:** esto sigue siendo una mitigación, no seguridad real. Como es un sitio 100% estático sin backend, no hay forma de ocultarle un archivo a alguien que sepa pedirlo directamente por URL (un estudiante técnicamente decidido podría igual entrar a `.../banks/<tema>.answers.json` a mano). El generador no cambia esa garantía — solo evita que la separación se rompa por un error de tipeo al mantener los archivos a mano. Si el docente necesita una garantía real de que las respuestas no se puedan ver, hace falta un backend — eso queda fuera del alcance de este proyecto.
 
-El juego arranca con **25 preguntas de ejemplo** repartidas en tres temas: SCRUM (8), programación básica (2) y cultura general (15). El orden es **aleatorio** (no repite ninguna hasta usar todas las del tema elegido, o las 25 en modo mixto), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas y temas que quieras en `questions/` siguiendo el mismo formato, sin tocar `app.js`.
+El juego arranca con **43 preguntas de ejemplo** repartidas en tres temas: SCRUM (16), fundamentos de programación (12) y cultura general (15). El orden es **aleatorio** (no repite ninguna hasta usar todas las del tema elegido, o las 43 en modo mixto), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas y temas que quieras en `questions/` siguiendo el mismo formato, sin tocar `app.js`.
 
 ## Limitaciones conocidas
 

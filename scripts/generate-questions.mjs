@@ -14,8 +14,12 @@
 'use strict';
 
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+
+// Shared pure helpers (also loaded by the browser as window.QuizRules).
+const QuizRules = createRequire(import.meta.url)('../quiz-rules.js');
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SOURCE_DIR = path.join(ROOT, 'questions');
@@ -146,6 +150,34 @@ function main() {
   const total = manifest.reduce((sum, t) => sum + t.count, 0);
   console.log(`Generated banks/ for ${manifest.length} topic(s), ${total} question(s):`);
   manifest.forEach((t) => console.log(`  ${t.id}: ${t.count}`));
+
+  reportBalance(entries, manifest);
+}
+
+// Balance guard: prints a distribution table and WARNINGS (never failures).
+function reportBalance(entries, manifest) {
+  const byId = new Map(entries.map(({ topic }) => [topic.id, topic.questions]));
+  const rows = manifest.map((t) => ({ label: t.id, questions: byId.get(t.id) }));
+  rows.push({ label: 'ALL (mixed)', questions: manifest.flatMap((t) => byId.get(t.id)) });
+
+  const pct = (n) => `${Math.round(n * 100)}%`;
+  const warnings = [];
+  console.log('\nCorrect-answer balance (count per letter | longest-correct | shortest-correct | max run):');
+  rows.forEach(({ label, questions }) => {
+    const s = QuizRules.balanceStats(questions);
+    const letters = OPTION_KEYS.map((k) => `${k}:${s.counts[k]} (${pct(s.shares[k])})`).join('  ');
+    console.log(
+      `  ${label.padEnd(20)} n=${String(s.total).padStart(2)}  ${letters}  | longest ${pct(s.longestShare)} | shortest ${s.shortestCount}/${s.total} | run ${s.maxRun}`
+    );
+    warnings.push(...QuizRules.balanceWarnings(label, s));
+  });
+
+  if (warnings.length === 0) {
+    console.log('\nNo balance warnings.');
+  } else {
+    console.log('');
+    warnings.forEach((w) => console.warn(`WARNING: ${w}`));
+  }
 }
 
 main();

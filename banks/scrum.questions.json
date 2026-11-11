@@ -1,82 +1,162 @@
 [
   {
-    "id": 3,
-    "text": "¿Qué es SCRUM?",
+    "id": 1,
+    "text": "¿Qué reunión sirve para planificar el trabajo del Sprint?",
     "options": {
-      "A": "Un lenguaje de programación.",
-      "B": "Un marco de trabajo ágil para desarrollar productos.",
-      "C": "Un tipo de base de datos.",
-      "D": "Un sistema operativo."
+      "A": "Daily Scrum",
+      "B": "Sprint Planning",
+      "C": "Sprint Review",
+      "D": "Sprint Retrospective"
+    }
+  },
+  {
+    "id": 2,
+    "text": "¿En qué reunión se muestra el Incremento a los interesados?",
+    "options": {
+      "A": "Sprint Planning",
+      "B": "Daily Scrum",
+      "C": "Sprint Retrospective",
+      "D": "Sprint Review"
+    }
+  },
+  {
+    "id": 3,
+    "text": "¿Cuánto dura un Sprint como máximo?",
+    "options": {
+      "A": "Un mes",
+      "B": "Dos meses",
+      "C": "Tres meses",
+      "D": "Seis meses"
     }
   },
   {
     "id": 4,
-    "text": "¿Cuáles son los tres roles de un equipo SCRUM?",
+    "text": "¿Cuánto dura como máximo el Daily Scrum?",
     "options": {
-      "A": "Product Owner, Scrum Master y Developers.",
-      "B": "Jefe, Programador y Tester.",
-      "C": "Cliente, Gerente y Diseñador.",
-      "D": "Líder, Analista y Soporte."
+      "A": "5 minutos",
+      "B": "10 minutos",
+      "C": "15 minutos",
+      "D": "30 minutos"
     }
   },
   {
     "id": 5,
-    "text": "En SCRUM, ¿qué es un Sprint?",
+    "text": "¿En qué reunión el equipo revisa cómo trabajó y planea mejoras?",
     "options": {
-      "A": "Una reunión diaria del equipo.",
-      "B": "La lista de tareas del proyecto.",
-      "C": "Un periodo fijo (máx. un mes) para crear un incremento.",
-      "D": "El documento final del producto."
+      "A": "Daily Scrum",
+      "B": "Sprint Review",
+      "C": "Sprint Retrospective",
+      "D": "Sprint Planning"
     }
   },
   {
     "id": 6,
-    "text": "¿Quién gestiona el Product Backlog y maximiza el valor del producto?",
+    "text": "¿En qué reunión los Developers ajustan su plan para lograr el Sprint Goal?",
     "options": {
-      "A": "El Scrum Master",
-      "B": "Los Developers",
-      "C": "El cliente",
-      "D": "El Product Owner"
+      "A": "Daily Scrum",
+      "B": "Sprint Planning",
+      "C": "Sprint Review",
+      "D": "Sprint Retrospective"
     }
   },
   {
     "id": 7,
-    "text": "¿Cuánto dura como máximo la Daily Scrum?",
+    "text": "¿Qué es el Sprint?",
     "options": {
-      "A": "15 minutos",
-      "B": "30 minutos",
-      "C": "1 hora",
-      "D": "4 horas"
+      "A": "Una reunión para planificar el trabajo del equipo",
+      "B": "Una lista ordenada de todo lo que necesita el producto",
+      "C": "Una reunión para revisar cómo trabajó el equipo",
+      "D": "Un período de trabajo de un mes o menos de duración"
     }
   },
   {
     "id": 8,
-    "text": "¿Cuál es la función principal del Scrum Master?",
+    "text": "¿Qué es el Sprint Backlog?",
     "options": {
-      "A": "Escribir todo el código.",
-      "B": "Decidir qué se construye.",
-      "C": "Guiar al equipo en SCRUM y remover impedimentos.",
-      "D": "Aprobar el presupuesto."
+      "A": "La lista ordenada de todo lo que necesita el producto",
+      "B": "Los elementos elegidos para el Sprint y su plan de trabajo",
+      "C": "El resultado terminado y usable del trabajo del Sprint",
+      "D": "La descripción de cuándo un trabajo se considera terminado"
     }
   },
   {
     "id": 9,
-    "text": "¿Qué es el Product Backlog?",
+    "text": "¿Qué es el Sprint Goal?",
     "options": {
-      "A": "Un informe de errores.",
-      "B": "El calendario de reuniones.",
-      "C": "El código fuente del proyecto.",
-      "D": "Una lista ordenada de lo necesario para mejorar el producto."
+      "A": "La lista ordenada de todo lo que necesita el producto",
+      "B": "El resultado terminado y usable del trabajo del Sprint",
+      "C": "La meta de largo plazo que busca lograr todo el producto",
+      "D": "El objetivo único que se busca lograr en el Sprint"
     }
   },
   {
     "id": 10,
-    "text": "¿En qué evento el equipo reflexiona sobre cómo mejorar su forma de trabajar?",
+    "text": "¿Cómo se llama la lista ordenada de todo lo que necesita el producto?",
     "options": {
-      "A": "Sprint Planning",
-      "B": "Sprint Retrospective",
-      "C": "Daily Scrum",
-      "D": "Sprint Review"
+      "A": "Sprint Backlog",
+      "B": "Product Backlog",
+      "C": "Product Goal",
+      "D": "Definition of Done"
+    }
+  },
+  {
+    "id": 11,
+    "text": "¿Qué es el Incremento?",
+    "options": {
+      "A": "El plan de trabajo que el equipo arma para el Sprint",
+      "B": "La descripción de cuándo un trabajo se considera terminado",
+      "C": "El resultado terminado y usable del trabajo del Sprint",
+      "D": "La lista ordenada de todo lo que necesita el producto"
+    }
+  },
+  {
+    "id": 12,
+    "text": "¿Quién es responsable de ordenar el Product Backlog?",
+    "options": {
+      "A": "El Product Owner",
+      "B": "El Scrum Master",
+      "C": "Los Developers",
+      "D": "Los interesados del producto"
+    }
+  },
+  {
+    "id": 13,
+    "text": "¿Qué rol ayuda al equipo a entender y aplicar Scrum?",
+    "options": {
+      "A": "El Scrum Master",
+      "B": "El Product Owner",
+      "C": "Los Developers",
+      "D": "Los interesados del producto"
+    }
+  },
+  {
+    "id": 14,
+    "text": "¿Quiénes crean el Incremento durante el Sprint?",
+    "options": {
+      "A": "El Scrum Master",
+      "B": "Los interesados del producto",
+      "C": "Los Developers",
+      "D": "El Product Owner"
+    }
+  },
+  {
+    "id": 15,
+    "text": "¿Qué se define en la Sprint Planning?",
+    "options": {
+      "A": "Cómo mejorar la forma de trabajar del equipo",
+      "B": "Qué trabajo hacer en el Sprint y cómo hacerlo",
+      "C": "Qué se logró y qué cambia en el Product Backlog",
+      "D": "Qué hizo cada Developer desde el día anterior"
+    }
+  },
+  {
+    "id": 16,
+    "text": "¿Para qué sirve la Sprint Retrospective?",
+    "options": {
+      "A": "Para mostrar el Incremento a los interesados",
+      "B": "Para decidir qué trabajo entra en el Sprint",
+      "C": "Para ajustar el plan de trabajo de cada día",
+      "D": "Para mejorar la forma de trabajar del equipo"
     }
   }
 ]

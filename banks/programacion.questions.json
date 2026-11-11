@@ -1,22 +1,122 @@
 [
   {
     "id": 1,
-    "text": "¿Cuál es la función principal de HTML en un sitio web?",
+    "text": "¿Qué hace HTML en una página web?",
     "options": {
-      "A": "Animaciones y efectos visuales.",
-      "B": "Pagos y bases de datos.",
-      "C": "Estructura y esqueleto del sitio.",
-      "D": "Subir archivos a la nube."
+      "A": "Define los colores, las letras y el diseño visual",
+      "B": "Hace que la página reaccione cuando alguien hace clic",
+      "C": "Define la estructura y el contenido de la página",
+      "D": "Guarda en un lugar seguro todos los datos de los usuarios"
     }
   },
   {
     "id": 2,
-    "text": "¿Qué aporta JavaScript (JS) a una aplicación web?",
+    "text": "¿Qué hace CSS en una página web?",
     "options": {
-      "A": "Guardar fotos en el servidor.",
-      "B": "Interactividad y comportamiento dinámico.",
-      "C": "Formato de texto simple.",
-      "D": "Reemplazar a HTML y CSS."
+      "A": "Define el aspecto visual: colores, letras y posición",
+      "B": "Define la estructura y el contenido de la página",
+      "C": "Hace que la página reaccione cuando alguien hace clic",
+      "D": "Guarda en un lugar seguro todos los datos de los usuarios"
+    }
+  },
+  {
+    "id": 3,
+    "text": "¿Qué hace JavaScript en una página web?",
+    "options": {
+      "A": "Define la estructura y el contenido de la página",
+      "B": "Define el aspecto visual: colores, letras y posición",
+      "C": "Guarda en un lugar seguro todos los datos de los usuarios",
+      "D": "Agrega interactividad: la página responde al usuario"
+    }
+  },
+  {
+    "id": 4,
+    "text": "¿Qué es un navegador web?",
+    "options": {
+      "A": "Una computadora que guarda y envía páginas a otras",
+      "B": "Un programa que se usa para abrir y ver páginas web",
+      "C": "Un lugar donde se guardan todos los datos de una empresa",
+      "D": "Un lenguaje con reglas para dar instrucciones"
+    }
+  },
+  {
+    "id": 5,
+    "text": "¿Qué es un servidor?",
+    "options": {
+      "A": "Un programa que se usa para abrir y ver páginas web",
+      "B": "Una computadora que guarda y envía información a otras",
+      "C": "Un conjunto ordenado de pasos para resolver un problema",
+      "D": "Un lenguaje con reglas para dar instrucciones"
+    }
+  },
+  {
+    "id": 6,
+    "text": "¿Qué es el frontend de una aplicación?",
+    "options": {
+      "A": "La parte que trabaja detrás, procesando datos",
+      "B": "El texto con las instrucciones del programa",
+      "C": "Una lista de pasos ordenados para resolver un problema",
+      "D": "La parte que ve y usa la persona en su pantalla"
+    }
+  },
+  {
+    "id": 7,
+    "text": "¿Qué es el backend de una aplicación?",
+    "options": {
+      "A": "La parte que trabaja detrás, procesando y guardando datos",
+      "B": "La parte que la persona ve y usa en su pantalla",
+      "C": "El programa con el que se abren las páginas web de internet",
+      "D": "Un conjunto ordenado de pasos para resolver un problema"
+    }
+  },
+  {
+    "id": 8,
+    "text": "¿Para qué sirve una base de datos?",
+    "options": {
+      "A": "Para definir los colores y el diseño de una página web",
+      "B": "Para abrir y mostrar páginas web en una pantalla",
+      "C": "Para guardar información ordenada y poder consultarla",
+      "D": "Para escribir las instrucciones que sigue un programa"
+    }
+  },
+  {
+    "id": 9,
+    "text": "¿Qué es un algoritmo?",
+    "options": {
+      "A": "Una lista de pasos ordenados para resolver un problema",
+      "B": "Un error que hace que el programa funcione mal",
+      "C": "Un espacio con nombre donde se guarda un valor",
+      "D": "Un lugar donde se guardan todos los datos de una empresa"
+    }
+  },
+  {
+    "id": 10,
+    "text": "¿Qué es una variable en programación?",
+    "options": {
+      "A": "Una lista de pasos ordenados para resolver un problema",
+      "B": "Un error que hace que el programa funcione mal",
+      "C": "Un espacio con nombre donde se guarda un dato cambiante",
+      "D": "El texto con las instrucciones que escribe quien programa"
+    }
+  },
+  {
+    "id": 11,
+    "text": "¿Qué es un lenguaje de programación?",
+    "options": {
+      "A": "Un programa que se usa para abrir y ver páginas web",
+      "B": "Una computadora que guarda y envía información a otras",
+      "C": "Una lista de pasos ordenados para resolver un problema",
+      "D": "Un conjunto de reglas para darle órdenes a una computadora"
+    }
+  },
+  {
+    "id": 12,
+    "text": "¿Qué es un bug?",
+    "options": {
+      "A": "Una lista de pasos ordenados para resolver un problema",
+      "B": "Un error en el código que hace fallar al programa",
+      "C": "Un espacio con nombre donde se guarda un dato cambiante",
+      "D": "Un programa que se usa para abrir y ver páginas web"
     }
   }
 ]

@@ -167,4 +167,25 @@ assert.equal(Q.parseStoredTopic(null, mf), Q.ALL_TOPICS);
 assert.equal(Q.parseStoredTopic('scrum', null), Q.ALL_TOPICS);
 assert.equal(Q.parseStoredTopic(Q.ALL_TOPICS, mf), Q.ALL_TOPICS);
 
+// Balance stats / warnings
+const mk = (correct, opts) => ({ options: { A: opts[0], B: opts[1], C: opts[2], D: opts[3] }, correctAnswer: correct });
+const bs = Q.balanceStats([
+  mk('A', ['longest!', 'bb', 'cc', 'dd']), // correct strictly longest
+  mk('A', ['aa', 'bbb', 'cc', 'dd']),
+  mk('A', ['aa', 'bb', 'cc', 'dd']), // run of 3
+  mk('D', ['aaa', 'bbb', 'ccc', 'd']), // correct strictly shortest
+]);
+assert.deepEqual(bs.counts, { A: 3, B: 0, C: 0, D: 1 });
+assert.equal(bs.longestCount, 1);
+assert.equal(bs.shortestCount, 1);
+assert.equal(bs.maxRun, 3);
+const bw = Q.balanceWarnings('t', bs);
+assert.ok(bw.some((w) => w.includes('letter A')));
+assert.ok(bw.some((w) => w.includes('letter B')));
+assert.ok(bw.some((w) => w.includes('consecutive')));
+const balanced = Q.balanceStats(['A', 'B', 'C', 'D'].map((c) => mk(c, ['aa', 'bb', 'cc', 'dd'])));
+assert.deepEqual(Q.balanceWarnings('ok', balanced), []);
+const allLongest = Q.balanceStats(['A', 'B', 'C', 'D'].map((c) => mk(c, ['a', 'b', 'c', 'd'].map((x) => x))).map((q) => ({ ...q, options: { ...q.options, [q.correctAnswer]: 'longer' } })));
+assert.ok(Q.balanceWarnings('l', allLongest).some((w) => w.includes('longest')));
+
 console.log('quiz-rules: all checks passed');

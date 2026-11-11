@@ -351,7 +351,72 @@
     return manifest.some((topic) => topic.id === raw) ? raw : ALL_TOPICS;
   }
 
-  const api = { ALL_TOPICS, parseManifest, namespaceId, buildBank, buildRoomId, parseStoredTopic, clampDwellSec, serializeAutoAdvance, parseAutoAdvance, shouldScheduleAutoAdvance, shouldFireAutoAdvance, dwellRemainingSec, reconnectDelayMs, reconnectDecision, isTargetedElsewhere, isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
+  // ---- Question balance stats (used by scripts/generate-questions.mjs) ------
+  /**
+   * @param {Array<{options: Object<string,string>, correctAnswer: string}>} questions in file order
+   * @returns {{total: number, counts: Object<string,number>, shares: Object<string,number>,
+   *   longestCount: number, longestShare: number, shortestCount: number, maxRun: number}}
+   *   "longest"/"shortest" are STRICT: the correct option is strictly longer/shorter than every other.
+   */
+  function balanceStats(questions) {
+    const letters = ['A', 'B', 'C', 'D'];
+    const counts = { A: 0, B: 0, C: 0, D: 0 };
+    let longest = 0;
+    let shortest = 0;
+    let maxRun = 0;
+    let run = 0;
+    let prev = null;
+    (questions || []).forEach((q) => {
+      counts[q.correctAnswer] += 1;
+      const correctLen = q.options[q.correctAnswer].length;
+      const others = letters.filter((l) => l !== q.correctAnswer).map((l) => q.options[l].length);
+      if (others.every((len) => correctLen > len)) longest += 1;
+      if (others.every((len) => correctLen < len)) shortest += 1;
+      run = q.correctAnswer === prev ? run + 1 : 1;
+      prev = q.correctAnswer;
+      if (run > maxRun) maxRun = run;
+    });
+    const total = (questions || []).length;
+    const shares = {};
+    letters.forEach((l) => {
+      shares[l] = total ? counts[l] / total : 0;
+    });
+    return {
+      total,
+      counts,
+      shares,
+      longestCount: longest,
+      longestShare: total ? longest / total : 0,
+      shortestCount: shortest,
+      maxRun,
+    };
+  }
+
+  /**
+   * Human-readable warnings for a stats object: any letter share outside
+   * 15%-35%, the correct option strictly longest in >40% of questions, or 3+
+   * consecutive identical correct letters. (Questions < 4 are too few to judge shares.)
+   */
+  function balanceWarnings(label, stats) {
+    const warnings = [];
+    if (stats.total >= 4) {
+      ['A', 'B', 'C', 'D'].forEach((l) => {
+        const share = stats.shares[l];
+        if (share < 0.15 || share > 0.35) {
+          warnings.push(label + ': correct letter ' + l + ' is ' + Math.round(share * 100) + '% (expected 15%-35%)');
+        }
+      });
+    }
+    if (stats.longestShare > 0.4) {
+      warnings.push(label + ': the correct option is the longest in ' + Math.round(stats.longestShare * 100) + '% of questions (max 40%)');
+    }
+    if (stats.maxRun >= 3) {
+      warnings.push(label + ': ' + stats.maxRun + ' consecutive questions share the same correct letter (max 2)');
+    }
+    return warnings;
+  }
+
+  const api = { balanceStats, balanceWarnings, ALL_TOPICS, parseManifest, namespaceId, buildBank, buildRoomId, parseStoredTopic, clampDwellSec, serializeAutoAdvance, parseAutoAdvance, shouldScheduleAutoAdvance, shouldFireAutoAdvance, dwellRemainingSec, reconnectDelayMs, reconnectDecision, isTargetedElsewhere, isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.QuizRules = api;
 })(typeof window !== 'undefined' ? window : globalThis);
