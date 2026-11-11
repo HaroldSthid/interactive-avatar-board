@@ -1,0 +1,152 @@
+[
+  {
+    "id": 1,
+    "text": "¿Qué es CodePen?",
+    "options": {
+      "A": "Un programa para escribir documentos y presentaciones de texto",
+      "B": "Un lugar para guardar proyectos y ver el historial de cambios",
+      "C": "Un sitio para escribir HTML, CSS y JS y ver el resultado",
+      "D": "Un entorno para escribir y ejecutar código de Python por celdas"
+    }
+  },
+  {
+    "id": 2,
+    "text": "Copiaste reglas de CSS (colores y letras) de un ejemplo. ¿En qué panel de CodePen las pegas?",
+    "options": {
+      "A": "HTML",
+      "B": "CSS",
+      "C": "JS",
+      "D": "El panel del resultado"
+    }
+  },
+  {
+    "id": 3,
+    "text": "Copiaste código que hace que un botón responda al hacer clic. ¿En qué panel de CodePen lo pegas?",
+    "options": {
+      "A": "HTML",
+      "B": "CSS",
+      "C": "El panel del resultado",
+      "D": "JS"
+    }
+  },
+  {
+    "id": 4,
+    "text": "Pegaste solo reglas de CSS dentro del panel de HTML. ¿Qué suele pasar?",
+    "options": {
+      "A": "Se muestran como texto y los colores no cambian",
+      "B": "Los colores cambian igual que si estuvieran en CSS",
+      "C": "CodePen las mueve solo al panel correcto",
+      "D": "Se borra todo el proyecto guardado"
+    }
+  },
+  {
+    "id": 5,
+    "text": "En CodePen cambias un color, miras el resultado y ajustas otra vez. ¿Cómo se llama este ciclo?",
+    "options": {
+      "A": "Clonar el proyecto a otra cuenta",
+      "B": "Iterar: probar, mirar y ajustar",
+      "C": "Ejecutar un script de Python completo",
+      "D": "Crear un repositorio nuevo en la nube"
+    }
+  },
+  {
+    "id": 6,
+    "text": "¿Qué conviene saber antes de pegar código copiado en CodePen?",
+    "options": {
+      "A": "Que funciona igual en cualquier panel",
+      "B": "Que CodePen lo corrige solo si está mal ubicado",
+      "C": "Qué hace y en qué panel debe ir",
+      "D": "Que el resultado siempre se verá bien"
+    }
+  },
+  {
+    "id": 7,
+    "text": "¿Qué es Google Colab?",
+    "options": {
+      "A": "Un entorno en el navegador para ejecutar Python por celdas",
+      "B": "Un sitio para armar páginas web y ver el resultado al instante",
+      "C": "Un lugar para guardar proyectos y ver su historial de cambios",
+      "D": "Un programa para editar fotos y videos en la computadora"
+    }
+  },
+  {
+    "id": 8,
+    "text": "¿Qué es un script de Python?",
+    "options": {
+      "A": "Una página web con su estructura y su diseño",
+      "B": "Un error que detiene el funcionamiento del programa",
+      "C": "Una copia de un proyecto que pertenece a otra persona",
+      "D": "Un conjunto de instrucciones escritas en Python"
+    }
+  },
+  {
+    "id": 9,
+    "text": "En Colab, ¿cómo se ejecuta el código de una celda?",
+    "options": {
+      "A": "Guardando el archivo en el navegador",
+      "B": "Con el botón de reproducir de esa celda",
+      "C": "Subiéndolo antes a un repositorio",
+      "D": "Esperando que Colab lo ejecute solo al escribirlo"
+    }
+  },
+  {
+    "id": 10,
+    "text": "Cuando ejecutas código en Colab, ¿dónde se ejecuta realmente?",
+    "options": {
+      "A": "En tu propia computadora o en tu celular",
+      "B": "En el repositorio de GitHub donde lo subiste",
+      "C": "En computadoras de Google, en la nube",
+      "D": "En el panel de resultado de CodePen"
+    }
+  },
+  {
+    "id": 11,
+    "text": "¿Qué es GitHub?",
+    "options": {
+      "A": "Un sitio para guardar proyectos de código y su historial",
+      "B": "Un sitio para escribir HTML, CSS y JS y ver el resultado al instante",
+      "C": "Un entorno para ejecutar código Python por celdas en el navegador",
+      "D": "Un lenguaje de programación para crear páginas web"
+    }
+  },
+  {
+    "id": 12,
+    "text": "¿Qué es un repositorio en GitHub?",
+    "options": {
+      "A": "Una celda de Colab donde se escribe y ejecuta Python",
+      "B": "Un panel de CodePen donde se pega código",
+      "C": "Un error que aparece al subir un archivo a la nube",
+      "D": "La carpeta de un proyecto con sus archivos"
+    }
+  },
+  {
+    "id": 13,
+    "text": "¿Para qué se crea un repositorio al subir un ejercicio?",
+    "options": {
+      "A": "Para que el ejercicio se ejecute solo en la nube",
+      "B": "Para convertir el código de Python en una página HTML",
+      "C": "Para guardarlo, compartirlo y conservar sus versiones",
+      "D": "Porque Colab no funciona si no existe uno en GitHub"
+    }
+  },
+  {
+    "id": 14,
+    "text": "Ves un repositorio de otra persona en GitHub. ¿Qué puedes hacer normalmente?",
+    "options": {
+      "A": "Cambiar sus archivos directamente aunque no seas el dueño",
+      "B": "Verlo y copiarlo a tu cuenta, sin cambiar el original",
+      "C": "Borrarlo para que no lo vea nadie más en GitHub",
+      "D": "Hacerlo tuyo sin necesidad de copiarlo antes"
+    }
+  },
+  {
+    "id": 15,
+    "text": "¿Qué significa hacer un fork de un repositorio?",
+    "options": {
+      "A": "Copiarlo a tu cuenta para trabajar en tu propia versión",
+      "B": "Borrar el original y quedarte solo con tu propia versión",
+      "C": "Ejecutar su código en la nube de Google Colab",
+      "D": "Cambiar el original sin pedir permiso al dueño"
+    }
+  }
+]
