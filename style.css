@@ -899,3 +899,22 @@ button {
   border-color: var(--color-neon-red);
   box-shadow: 0 0 8px rgba(255, 56, 96, 0.6), 0 0 20px rgba(255, 56, 96, 0.25);
 }
+
+/* Brief highlight when the bonus panel is revealed (BONUS_ROUND / BONUS_RESULTS). */
+@keyframes bonus-panel-flash {
+  from { box-shadow: 0 0 0 3px var(--color-neon-yellow), 0 0 24px var(--color-neon-yellow); }
+  to { box-shadow: 0 0 0 0 transparent; }
+}
+
+.bonus-panel--flash {
+  animation: bonus-panel-flash 1.5s ease-out;
+}
+
+.bonus-leaderboard__item[data-waiting='true'] {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bonus-panel--flash { animation: none; }
+}

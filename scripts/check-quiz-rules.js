@@ -86,4 +86,13 @@ const bonusLines = Q.buildResultsCsv(
 assert.equal(bonusLines[1], '"=""0000000002""",Ann,2,2,3,1,0,no');
 assert.equal(bonusLines[2], '"=""0000000003""",Bob,0,2,1,2,9,yes');
 
+// Bonus stall grace
+const stall = (over) => Q.isFinalistStalled({ now: 100000, lastSeen: 100000, hasReported: false, staleMs: 5000, initialGraceMs: 20000, ...over });
+assert.equal(stall({}), false);
+assert.equal(stall({ lastSeen: 100000 - 6000 }), false); // never reported: 6s is within grace
+assert.equal(stall({ lastSeen: 100000 - 19999 }), false);
+assert.equal(stall({ lastSeen: 100000 - 20000 }), true);
+assert.equal(stall({ hasReported: true, lastSeen: 100000 - 4999 }), false); // reported: 5s rule
+assert.equal(stall({ hasReported: true, lastSeen: 100000 - 5000 }), true);
+
 console.log('quiz-rules: all checks passed');

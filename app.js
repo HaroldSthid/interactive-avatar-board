@@ -778,6 +778,7 @@ function renderDashboard() {
   renderFinalRankingPanel();
   renderBonusLeaderboard();
   renderBonusChampionReveal();
+  revealBonusPanelOnEntry();
 }
 
 /**
@@ -888,6 +889,32 @@ function renderFinalRankingPanel() {
  * a result — each only ever touches the panel for its own state.
  * @satisfies specs/bonus-round/spec.md — Live Host Leaderboard, Stalled Finalist Handling
  */
+/**
+ * On entering BONUS_ROUND or BONUS_RESULTS (once per transition, not on every
+ * re-render), smooth-scrolls the shared bonus panel into view and flashes a
+ * short highlight. Honors prefers-reduced-motion; no-ops if the panel is missing.
+ */
+let lastRevealedBonusState = null;
+function revealBonusPanelOnEntry() {
+  const current = gameState.current;
+  const isBonusView = current === GAME_STATES.BONUS_ROUND || current === GAME_STATES.BONUS_RESULTS;
+  if (!isBonusView) {
+    lastRevealedBonusState = null;
+    return;
+  }
+  if (lastRevealedBonusState === current) return;
+  lastRevealedBonusState = current;
+
+  const panel = document.getElementById('board-bonus-leaderboard');
+  if (!panel || panel.hidden) return;
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  panel.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+  panel.classList.remove('bonus-panel--flash');
+  void panel.offsetWidth; // restart the CSS animation
+  panel.classList.add('bonus-panel--flash');
+  setTimeout(() => panel.classList.remove('bonus-panel--flash'), 1600);
+}
+
 function renderBonusLeaderboard() {
   const panel = document.getElementById('board-bonus-leaderboard');
   if (!panel) return;
@@ -921,7 +948,7 @@ function renderBonusLeaderboard() {
   const standings = gameState.bonusFinalists
     .map((studentId) => ({
       studentId,
-      ...(gameState.bonusScores[studentId] || { score: 0, alive: true, stalled: false }),
+      ...(gameState.bonusScores[studentId] || { score: 0, alive: true, stalled: false, reported: false }),
     }))
     .sort((a, b) => b.score - a.score);
 
@@ -931,9 +958,14 @@ function renderBonusLeaderboard() {
     const item = document.createElement('li');
     item.className = 'bonus-leaderboard__item';
     item.dataset.stalled = String(!!entry.stalled);
-    item.textContent = entry.stalled
-      ? `${entry.studentId} — ${entry.score} pts (stalled)`
-      : `${entry.studentId} — ${entry.score} pts`;
+    item.dataset.waiting = String(!entry.reported && !entry.stalled);
+    if (entry.stalled) {
+      item.textContent = `${entry.studentId} — ${entry.score} pts (stalled)`;
+    } else if (!entry.reported) {
+      item.textContent = `${entry.studentId} — waiting for device…`;
+    } else {
+      item.textContent = `${entry.studentId} — ${entry.score} pts`;
+    }
     list.appendChild(item);
   });
   panel.appendChild(list);
@@ -1729,6 +1761,7 @@ function handleHostMessage(message) {
       // mid-run"), so a late-arriving message after a brief stall just means
       // they're back.
       entry.stalled = false;
+      entry.reported = true; // first report ends the longer initial grace
       gameState.bonusLastSeen[studentId] = Date.now();
       renderDashboard(); // re-renders renderBonusLeaderboard() with the updated score
       checkBonusRoundFinalization();
@@ -2109,6 +2142,10 @@ function initControllerOptions() {
 // disconnect mid-run" — the relay never notifies the host of a drop, so a
 // timeout is the only available signal; >16x the 300ms report interval).
 const BONUS_STALE_MS = 5000;
+// A finalist that has not sent ANY BONUS_SCORE yet (phone asleep, backgrounded,
+// BONUS_START not received) gets this longer grace before being stalled; after
+// its first report BONUS_STALE_MS applies. See QuizRules.isFinalistStalled().
+const BONUS_INITIAL_GRACE_MS = 20000;
 // Hard cap on round length from BONUS_START, regardless of how many
 // finalists are still alive (specs/bonus-round/spec.md — Round Finalization).
 const BONUS_MAX_MS = 180000;
@@ -2163,7 +2200,7 @@ function startBonusRound() {
   gameState.bonusStartedAt = startedAt;
 
   finalists.forEach((studentId) => {
-    gameState.bonusScores[studentId] = { score: 0, alive: true, stalled: false };
+    gameState.bonusScores[studentId] = { score: 0, alive: true, stalled: false, reported: false };
     gameState.bonusLastSeen[studentId] = startedAt;
   });
 
@@ -2194,7 +2231,15 @@ function startBonusStallCheck() {
       const entry = gameState.bonusScores[studentId];
       if (!entry || entry.alive === false || entry.stalled) return;
       const lastSeen = gameState.bonusLastSeen[studentId] || 0;
-      if (now - lastSeen >= BONUS_STALE_MS) {
+      if (
+        window.QuizRules.isFinalistStalled({
+          now,
+          lastSeen,
+          hasReported: entry.reported === true,
+          staleMs: BONUS_STALE_MS,
+          initialGraceMs: BONUS_INITIAL_GRACE_MS,
+        })
+      ) {
         entry.stalled = true;
         changed = true;
       }

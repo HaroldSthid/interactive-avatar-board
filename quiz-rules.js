@@ -204,7 +204,18 @@
     };
   }
 
-  const api = { serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
+  /**
+   * Stall decision for one bonus finalist. A finalist that has never reported
+   * gets initialGraceMs (counted from lastSeen, seeded at BONUS_START); once
+   * it has reported, the shorter staleMs applies.
+   * @returns {boolean} true when the finalist should be marked stalled
+   */
+  function isFinalistStalled({ now, lastSeen, hasReported, staleMs, initialGraceMs }) {
+    const limit = hasReported ? staleMs : Math.max(staleMs, initialGraceMs);
+    return now - lastSeen >= limit;
+  }
+
+  const api = { isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.QuizRules = api;
 })(typeof window !== 'undefined' ? window : globalThis);
