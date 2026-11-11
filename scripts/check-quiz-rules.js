@@ -95,4 +95,19 @@ assert.equal(stall({ lastSeen: 100000 - 20000 }), true);
 assert.equal(stall({ hasReported: true, lastSeen: 100000 - 4999 }), false); // reported: 5s rule
 assert.equal(stall({ hasReported: true, lastSeen: 100000 - 5000 }), true);
 
+// Reconnect backoff / decision / targeting
+assert.deepEqual([0, 1, 2, 3, 4, 5, 50].map((n) => Q.reconnectDelayMs(n)), [1000, 2000, 4000, 8000, 10000, 10000, 10000]);
+assert.equal(Q.reconnectDelayMs(-1), 1000);
+assert.equal(Q.reconnectDelayMs(NaN), 1000);
+const dec = (o) => Q.reconnectDecision({ closeCode: 1006, stopped: false, fatal: false, hostCode: 4001, ...o });
+assert.equal(dec({}), 'retry');
+assert.equal(dec({ closeCode: 1000 }), 'retry');
+assert.equal(dec({ closeCode: 4001 }), 'host-gone');
+assert.equal(dec({ stopped: true }), 'stop');
+assert.equal(dec({ fatal: true }), 'stop');
+assert.equal(Q.isTargetedElsewhere({ targetStudentId: 'a' }, 'b'), true);
+assert.equal(Q.isTargetedElsewhere({ targetStudentId: 'a' }, 'a'), false);
+assert.equal(Q.isTargetedElsewhere({ finalists: [] }, 'a'), false);
+assert.equal(Q.isTargetedElsewhere(undefined, 'a'), false);
+
 console.log('quiz-rules: all checks passed');

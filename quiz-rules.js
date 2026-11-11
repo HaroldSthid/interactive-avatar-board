@@ -215,7 +215,29 @@
     return now - lastSeen >= limit;
   }
 
-  const api = { isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
+  /** Exponential backoff for student reconnects: 1s, 2s, 4s, 8s, then capped (10s). */
+  function reconnectDelayMs(attempt, baseMs = 1000, capMs = 10000) {
+    const n = Number.isFinite(attempt) && attempt > 0 ? Math.floor(attempt) : 0;
+    return Math.min(baseMs * 2 ** Math.min(n, 30), capMs);
+  }
+
+  /**
+   * What to do when a student socket closes.
+   * 'host-gone' (close code hostCode: terminal), 'stop' (deliberate close or
+   * fatal relay error), otherwise 'retry'.
+   */
+  function reconnectDecision({ closeCode, stopped, fatal, hostCode }) {
+    if (closeCode === hostCode) return 'host-gone';
+    if (stopped || fatal) return 'stop';
+    return 'retry';
+  }
+
+  /** True when a host payload targets a different student than studentId. */
+  function isTargetedElsewhere(payload, studentId) {
+    return Boolean(payload) && payload.targetStudentId !== undefined && payload.targetStudentId !== studentId;
+  }
+
+  const api = { reconnectDelayMs, reconnectDecision, isTargetedElsewhere, isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.QuizRules = api;
 })(typeof window !== 'undefined' ? window : globalThis);

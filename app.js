@@ -154,7 +154,10 @@ function initViewToggles() {
   }
 
   if (btnBackToSetupController) {
-    btnBackToSetupController.addEventListener('click', () => navigateTo('setup'));
+    btnBackToSetupController.addEventListener('click', () => {
+      stopStudentSession();
+      navigateTo('setup');
+    });
   }
 }
 
@@ -242,6 +245,9 @@ const gameState = {
   // students never load it just by opening the app. null until fetched.
   answerKey: null,
   relaySocket: null, // student: this device's WebSocket connection to the relay
+  clientSession: null, // student: { roomId, studentId, avatar, avatarImage, stopped, attempt, timerId } — drives auto-reconnect
+  wakeLock: null, // student: active screen WakeLockSentinel, if any
+  currentQuestionPayload: null, // host: last START_QUESTION payload, re-sent to a reconnecting student
   studentId: null, // student: this device's Student ID
   controllerQuestionStartedAt: null, // student: local clock ref for elapsed time
   controllerCurrentQuestionId: null, // student: questionId of the active question
@@ -591,16 +597,14 @@ function startNewQuestionRound() {
     scheduleSimulatedSubmissions();
   }
 
-  broadcastToStudents({
-    type: MSG_TYPES.START_QUESTION,
-    payload: {
-      questionId: gameState.questionId,
-      text: question ? question.text : 'New question! Choose your answer.',
-      options: question ? question.options : QUADRANTS,
-      startedAt: gameState.questionStartedAt,
-      durationMs: QUESTION_DURATION_MS,
-    },
-  });
+  gameState.currentQuestionPayload = {
+    questionId: gameState.questionId,
+    text: question ? question.text : 'New question! Choose your answer.',
+    options: question ? question.options : QUADRANTS,
+    startedAt: gameState.questionStartedAt,
+    durationMs: QUESTION_DURATION_MS,
+  };
+  broadcastToStudents({ type: MSG_TYPES.START_QUESTION, payload: gameState.currentQuestionPayload });
 
   renderRoster();
 
@@ -1783,8 +1787,8 @@ function handleHostMessage(message) {
  *   student; when present, rendering prefers it over the preset `avatar`.
  */
 function registerRealStudent(studentId, avatar, avatarImage) {
-  const alreadyRegistered = gameState.students.some((student) => student.id === studentId);
-  if (!alreadyRegistered) {
+  const existing = gameState.students.find((student) => student.id === studentId);
+  if (!existing) {
     gameState.students.push({
       id: studentId,
       name: studentId,
@@ -1792,11 +1796,63 @@ function registerRealStudent(studentId, avatar, avatarImage) {
       avatarImage: avatarImage || null,
       isMock: false,
     });
+  } else {
+    // Re-JOIN of a known student (reconnect): keep the single roster entry,
+    // refresh its avatar if the student sent one.
+    if (avatar) existing.avatar = avatar;
+    if (avatarImage) existing.avatarImage = avatarImage;
   }
 
   broadcastToStudents({ type: MSG_TYPES.JOIN_ACK, payload: { studentId, status: 'ok' } });
 
   renderRoster();
+  if (existing) resyncReconnectedStudent(studentId);
+}
+
+/**
+ * Sends a reconnecting student the state it missed while offline. The relay
+ * can only broadcast, so every message carries targetStudentId; clients
+ * ignore targeted messages meant for someone else (see handleClientMessage()).
+ * Reuses the regular message types so existing handlers do the rendering.
+ * @param {string} studentId
+ */
+function resyncReconnectedStudent(studentId) {
+  const send = (type, payload) =>
+    broadcastToStudents({ type, payload: { ...payload, targetStudentId: studentId, resync: true } });
+
+  switch (gameState.current) {
+    case GAME_STATES.ACTIVE_QUESTION: {
+      const question = gameState.currentQuestionPayload;
+      if (!question || gameState.questionStartedAt === null) break;
+      const elapsedMs = Date.now() - gameState.questionStartedAt;
+      if (elapsedMs >= question.durationMs) break;
+      // elapsedMs (host clock) lets the phone align its countdown without
+      // trusting cross-device clocks.
+      send(MSG_TYPES.START_QUESTION, { ...question, elapsedMs });
+      break;
+    }
+    case GAME_STATES.LEADERBOARD:
+      send(MSG_TYPES.ROUND_END, { leaderboard: gameState.lastLeaderboard, totalScores: gameState.totalScores });
+      break;
+    case GAME_STATES.SESSION_END:
+      send(MSG_TYPES.SESSION_END, { finalRanking: gameState.finalRanking });
+      break;
+    case GAME_STATES.BONUS_ROUND: {
+      const entry = gameState.bonusScores[studentId];
+      if (entry && entry.alive !== false) {
+        // Hearing from the finalist again: un-stall and restart its silence clock.
+        entry.stalled = false;
+        gameState.bonusLastSeen[studentId] = Date.now();
+      }
+      send(MSG_TYPES.BONUS_START, { finalists: gameState.bonusFinalists, maxDurationMs: BONUS_MAX_MS });
+      break;
+    }
+    case GAME_STATES.BONUS_RESULTS:
+      send(MSG_TYPES.BONUS_END, { standings: gameState.bonusStandings, champions: gameState.bonusChampions });
+      break;
+    default:
+      break;
+  }
 }
 
 /**
@@ -1823,15 +1879,49 @@ function broadcastToStudents(message) {
  *   present.
  */
 function joinRoom(roomId, studentId, avatar, avatarImage) {
+  // A fresh join replaces any previous session (and its reconnect timer).
+  stopStudentSession();
   gameState.studentId = studentId;
+  gameState.bonusRole = null;
+  gameState.clientSession = { roomId, studentId, avatar, avatarImage, stopped: false, attempt: 0, timerId: null };
+  initStudentResilienceListeners();
+  connectStudentSocket();
+}
+
+// Close code the relay uses for "host disconnected" (server/src/rooms.js's
+// HOST_DISCONNECT_CODE): terminal, never retried.
+const HOST_DISCONNECT_CODE = 4001;
+
+/**
+ * Opens (or re-opens) the student's relay socket for the current session and
+ * runs HELLO -> HELLO_ACK -> JOIN. Guarded so at most one socket/timer exists.
+ */
+function connectStudentSocket() {
+  const session = gameState.clientSession;
+  if (!session || session.stopped) return;
+  if (getViewFromHash() !== 'controller') {
+    stopStudentSession(); // student left the view: no more reconnects
+    return;
+  }
+  const current = gameState.relaySocket;
+  if (current && (current.readyState === WebSocket.CONNECTING || current.readyState === WebSocket.OPEN)) return;
+  if (session.timerId !== null) {
+    clearTimeout(session.timerId);
+    session.timerId = null;
+  }
+
+  const { roomId, studentId, avatar, avatarImage } = session;
   const socket = new WebSocket(RELAY_URL);
   gameState.relaySocket = socket;
+  const isCurrent = () => gameState.relaySocket === socket && !session.stopped;
 
   socket.addEventListener('open', () => {
+    if (!isCurrent()) return;
     socket.send(JSON.stringify({ type: CONTROL_TYPES.HELLO, payload: { role: 'student', roomId } }));
   });
 
   socket.addEventListener('message', (event) => {
+    if (!isCurrent()) return;
     let message;
     try {
       message = JSON.parse(event.data);
@@ -1846,7 +1936,9 @@ function joinRoom(roomId, studentId, avatar, avatarImage) {
     }
 
     if (message.type === CONTROL_TYPES.ERROR) {
+      // e.g. ROOM_NOT_FOUND: the room is gone, retrying cannot help.
       console.error('Relay student error:', message.payload && message.payload.code);
+      session.fatal = true;
       setControllerStatus(`Student: ${studentId} (connection failed)`);
       return;
     }
@@ -1856,23 +1948,112 @@ function joinRoom(roomId, studentId, avatar, avatarImage) {
 
   socket.addEventListener('error', (err) => {
     console.error('Relay student socket error:', err);
-    setControllerStatus(`Student: ${studentId} (connection failed)`);
   });
 
-  // The relay closes every student socket in a room with this code (see
-  // server/src/rooms.js's HOST_DISCONNECT_CODE) when its host disconnects —
-  // without this, a student's screen is left showing a stale question with
-  // no indication the session is dead. A generic close (network drop,
-  // student navigating away) is already covered by the 'error' listener
-  // above and shouldn't be relabeled as a host disconnect.
-  const HOST_DISCONNECT_CODE = 4001;
   socket.addEventListener('close', (event) => {
-    if (event.code !== HOST_DISCONNECT_CODE) return;
-    setControllerStatus(`Student: ${studentId} (host disconnected)`);
-    setControllerQuestionText('Host disconnected. Ask your teacher to restart the session.');
-    setControllerOptionsEnabled(false);
-    gameState.controllerCountdownStop?.();
+    if (gameState.relaySocket !== socket) return; // superseded or deliberately replaced
+    const decision = window.QuizRules.reconnectDecision({
+      closeCode: event.code,
+      stopped: session.stopped,
+      fatal: session.fatal === true,
+      hostCode: HOST_DISCONNECT_CODE,
+    });
+    if (decision === 'host-gone') {
+      session.stopped = true;
+      releaseWakeLock();
+      setControllerStatus(`Student: ${studentId} (host disconnected)`);
+      setControllerQuestionText('Host disconnected. Ask your teacher to restart the session.');
+      setControllerOptionsEnabled(false);
+      gameState.controllerCountdownStop?.();
+      return;
+    }
+    if (decision === 'stop') {
+      if (session.fatal) setControllerStatus(`Student: ${studentId} (connection lost)`);
+      return;
+    }
+    scheduleStudentReconnect();
   });
+}
+
+function scheduleStudentReconnect() {
+  const session = gameState.clientSession;
+  if (!session || session.stopped || session.timerId !== null) return;
+  setControllerStatus(`Student: ${session.studentId} (reconnecting…)`);
+  const delay = window.QuizRules.reconnectDelayMs(session.attempt);
+  session.attempt += 1;
+  session.timerId = window.setTimeout(() => {
+    session.timerId = null;
+    connectStudentSocket();
+  }, delay);
+}
+
+/** Immediate reconnect attempt (tab visible again / network back) if not connected. */
+function reconnectStudentNow() {
+  const session = gameState.clientSession;
+  if (!session || session.stopped) return;
+  const socket = gameState.relaySocket;
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+  if (session.timerId !== null) {
+    clearTimeout(session.timerId);
+    session.timerId = null;
+  }
+  setControllerStatus(`Student: ${session.studentId} (reconnecting…)`);
+  connectStudentSocket();
+}
+
+/** Ends the student session: no reconnects, socket closed, wake lock released. */
+function stopStudentSession() {
+  const session = gameState.clientSession;
+  if (session) {
+    session.stopped = true;
+    if (session.timerId !== null) clearTimeout(session.timerId);
+    session.timerId = null;
+  }
+  gameState.clientSession = null;
+  const socket = gameState.relaySocket;
+  gameState.relaySocket = null;
+  if (socket && socket.readyState <= WebSocket.OPEN) socket.close();
+  releaseWakeLock();
+}
+
+let studentResilienceListenersReady = false;
+function initStudentResilienceListeners() {
+  if (studentResilienceListenersReady) return;
+  studentResilienceListenersReady = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    const session = gameState.clientSession;
+    if (!session || session.stopped) return;
+    requestWakeLock(); // wake locks are released when the tab hides
+    reconnectStudentNow();
+  });
+  window.addEventListener('online', reconnectStudentNow);
+}
+
+/** Keeps the phone screen awake while joined (no-op when unsupported). */
+async function requestWakeLock() {
+  try {
+    if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+    if (gameState.wakeLock && !gameState.wakeLock.released) return;
+    const sentinel = await navigator.wakeLock.request('screen');
+    gameState.wakeLock = sentinel;
+    sentinel.addEventListener('release', () => {
+      if (gameState.wakeLock === sentinel) gameState.wakeLock = null;
+    });
+  } catch (err) {
+    // Denied or unsupported (e.g. low battery, insecure context): not critical.
+  }
+}
+
+function releaseWakeLock() {
+  const sentinel = gameState.wakeLock;
+  gameState.wakeLock = null;
+  if (!sentinel) return;
+  try {
+    sentinel.release().catch(() => {});
+  } catch (err) {
+    // ignore
+  }
 }
 
 /**
@@ -1882,9 +2063,18 @@ function joinRoom(roomId, studentId, avatar, avatarImage) {
 function handleClientMessage(message) {
   if (!message || typeof message.type !== 'string') return;
 
+  // Targeted host messages (resync, see resyncReconnectedStudent()) are for
+  // one student only; untargeted broadcasts behave as always.
+  if (window.QuizRules.isTargetedElsewhere(message.payload, gameState.studentId)) return;
+  // A resent BONUS_START must not restart a bonus game this phone is still running.
+  if (message.type === MSG_TYPES.BONUS_START && message.payload && message.payload.resync && gameState.bonusRole !== null) return;
+
   switch (message.type) {
     case MSG_TYPES.JOIN_ACK: {
+      if (message.payload && message.payload.studentId !== gameState.studentId) break;
       setControllerStatus(`Student: ${gameState.studentId} (connected)`);
+      if (gameState.clientSession) gameState.clientSession.attempt = 0;
+      requestWakeLock();
       break;
     }
     case MSG_TYPES.JOIN_REJECT: {
@@ -1895,11 +2085,12 @@ function handleClientMessage(message) {
       setControllerQuestionText(`Join rejected. ${reason} Tap Exit and join again with a valid alias.`);
       setControllerOptionsEnabled(false);
       gameState.controllerCountdownStop?.();
-      if (gameState.relaySocket) gameState.relaySocket.close();
+      stopStudentSession(); // deliberate close: never auto-reconnect a rejected alias
       break;
     }
     case MSG_TYPES.START_QUESTION: {
-      gameState.controllerQuestionStartedAt = Date.now();
+      // elapsedMs is only present on a resync to a reconnecting student.
+      gameState.controllerQuestionStartedAt = Date.now() - ((message.payload && message.payload.elapsedMs) || 0);
       gameState.controllerCurrentQuestionId = message.payload && message.payload.questionId;
       gameState.controllerHasSubmitted = false;
       setControllerQuestionText((message.payload && message.payload.text) || 'Choose your answer!');
