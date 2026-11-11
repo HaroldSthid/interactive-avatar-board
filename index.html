@@ -31,7 +31,14 @@
             <span class="field__label">Room ID</span>
             <input type="text" id="input-host-room" class="field__input" placeholder="Generated on start" readonly />
           </label>
-          <button type="submit" class="btn btn--primary">Start Hosting</button>
+          <label class="field">
+            <span class="field__label">Question topic</span>
+            <select id="input-topic" class="field__input" disabled>
+              <option value="*">Loading topics…</option>
+            </select>
+          </label>
+          <p id="host-topic-status" class="field__hint" aria-live="polite"></p>
+          <button type="submit" id="btn-start-hosting" class="btn btn--primary" disabled>Start Hosting</button>
         </form>
 
         <form id="form-student" class="panel panel--student">
@@ -72,6 +79,7 @@
         <h1 class="brand brand--small">Race Board</h1>
         <div class="board__meta">
           <span id="board-room-id" class="badge">Room: --</span>
+          <span id="board-topic" class="badge" hidden></span>
           <button id="btn-back-to-setup-board" class="btn btn--ghost">Exit</button>
         </div>
       </header>
@@ -208,7 +216,6 @@
   </div>
 
   <script src="bonus-round.js"></script>
-  <script src="questions-public.js"></script>
   <script src="quiz-rules.js"></script>
   <script src="app.js"></script>
 </body>

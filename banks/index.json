@@ -1,0 +1,17 @@
+[
+  {
+    "id": "cultura-general",
+    "title": "Cultura general",
+    "count": 15
+  },
+  {
+    "id": "programacion",
+    "title": "Programación",
+    "count": 2
+  },
+  {
+    "id": "scrum",
+    "title": "SCRUM",
+    "count": 8
+  }
+]

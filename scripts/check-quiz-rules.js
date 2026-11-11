@@ -133,4 +133,38 @@ assert.equal(Q.dwellRemainingSec(1000, 8000), 7);
 assert.equal(Q.dwellRemainingSec(1000, 1001), 1);
 assert.equal(Q.dwellRemainingSec(9000, 8000), 0);
 
+// Topic banks
+const mf = Q.parseManifest([
+  { id: 'scrum', title: 'SCRUM', count: 8 },
+  { id: 'Bad Id', title: 'x', count: 1 },
+  { id: 'scrum', title: 'dup', count: 1 },
+  { id: 'empty', title: 'E', count: 0 },
+  { id: 'notitle', title: '  ', count: 2 },
+  null,
+  { id: 'cultura-general', title: 'Cultura general', count: 15 },
+]);
+assert.deepEqual(mf.map((t) => t.id), ['scrum', 'cultura-general']);
+assert.equal(Q.parseManifest({}), null);
+assert.equal(Q.parseManifest([]), null);
+assert.equal(Q.parseManifest([{ id: 'X' }]), null);
+assert.equal(Q.namespaceId('scrum', 3), 'scrum:3');
+const bank = Q.buildBank([
+  { id: 'a', questions: [{ id: 1, text: 'q1', options: {} }], answers: { 1: 'B' } },
+  { id: 'b', questions: [{ id: 1, text: 'q2', options: {} }], answers: { 1: 'C' } },
+]);
+assert.deepEqual(bank.questions.map((q) => q.key), ['a:1', 'b:1']); // same id, different topics
+assert.deepEqual(bank.answerKey, { 'a:1': 'B', 'b:1': 'C' });
+assert.throws(() => Q.buildBank([{ id: 'a', questions: [{ id: 1, text: 't', options: {} }], answers: {} }]));
+assert.throws(() => Q.buildBank([{ id: 'a', questions: [{ id: 1, text: 't', options: {} }], answers: { 1: 'Z' } }]));
+assert.equal(Q.buildRoomId('scrum', '4821'), 'SCRUM-4821');
+assert.equal(Q.buildRoomId('cultura-general', 'AB12'), 'CULTURA-GENERAL-AB12');
+assert.equal(Q.buildRoomId(null, '4821'), 'ROOM-4821');
+assert.equal(Q.buildRoomId(Q.ALL_TOPICS, '4821'), 'ROOM-4821');
+assert.ok(Q.buildRoomId('a'.repeat(100), 'ZZZZ').length <= 64);
+assert.equal(Q.parseStoredTopic('scrum', mf), 'scrum');
+assert.equal(Q.parseStoredTopic('gone', mf), Q.ALL_TOPICS);
+assert.equal(Q.parseStoredTopic(null, mf), Q.ALL_TOPICS);
+assert.equal(Q.parseStoredTopic('scrum', null), Q.ALL_TOPICS);
+assert.equal(Q.parseStoredTopic(Q.ALL_TOPICS, mf), Q.ALL_TOPICS);
+
 console.log('quiz-rules: all checks passed');

@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "text": "¿Cuál es la función principal de HTML en un sitio web?",
+    "options": {
+      "A": "Animaciones y efectos visuales.",
+      "B": "Pagos y bases de datos.",
+      "C": "Estructura y esqueleto del sitio.",
+      "D": "Subir archivos a la nube."
+    }
+  },
+  {
+    "id": 2,
+    "text": "¿Qué aporta JavaScript (JS) a una aplicación web?",
+    "options": {
+      "A": "Guardar fotos en el servidor.",
+      "B": "Interactividad y comportamiento dinámico.",
+      "C": "Formato de texto simple.",
+      "D": "Reemplazar a HTML y CSS."
+    }
+  }
+]

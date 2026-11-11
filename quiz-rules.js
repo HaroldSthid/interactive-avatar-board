@@ -285,7 +285,73 @@
     return Math.max(0, Math.ceil((endsAt - now) / 1000));
   }
 
-  const api = { clampDwellSec, serializeAutoAdvance, parseAutoAdvance, shouldScheduleAutoAdvance, shouldFireAutoAdvance, dwellRemainingSec, reconnectDelayMs, reconnectDecision, isTargetedElsewhere, isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
+  // ---- Topic banks -------------------------------------------------------
+  const ALL_TOPICS = '*'; // select value for "All topics (mixed)"; not a valid slug, so it can't collide
+  const TOPIC_ID_PATTERN = /^[a-z0-9-]+$/;
+  const ROOM_PREFIX_MAX = 40; // keep the Room ID well under the relay's 64-char limit
+
+  /**
+   * Validates banks/index.json. Returns only well-formed entries
+   * ({id: slug, title: non-empty string, count: positive integer}); returns
+   * null when the manifest isn't an array or has no valid entry.
+   */
+  function parseManifest(raw) {
+    if (!Array.isArray(raw)) return null;
+    const seen = new Set();
+    const topics = [];
+    raw.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const { id, title, count } = entry;
+      if (typeof id !== 'string' || !TOPIC_ID_PATTERN.test(id) || seen.has(id)) return;
+      if (typeof title !== 'string' || title.trim() === '') return;
+      if (!Number.isInteger(count) || count < 1) return;
+      seen.add(id);
+      topics.push({ id, title, count });
+    });
+    return topics.length > 0 ? topics : null;
+  }
+
+  /** Question ids can collide across topics, so internal keys are "<topic>:<id>". */
+  function namespaceId(topicId, id) {
+    return topicId + ':' + id;
+  }
+
+  /**
+   * Merges loaded topics into one bank.
+   * @param {Array<{id: string, questions: Array<{id: number, text: string, options: object}>, answers: Object<string,string>}>} topics
+   * @returns {{questions: Array<{key: string, text: string, options: object}>, answerKey: Object<string,string>}}
+   * @throws if a question has no valid A-D answer or a key repeats
+   */
+  function buildBank(topics) {
+    const questions = [];
+    const answerKey = {};
+    (topics || []).forEach((topic) => {
+      if (!Array.isArray(topic.questions)) throw new Error('Topic "' + topic.id + '" has no questions');
+      topic.questions.forEach((q) => {
+        const key = namespaceId(topic.id, q.id);
+        const answer = topic.answers && topic.answers[String(q.id)];
+        if (!['A', 'B', 'C', 'D'].includes(answer)) throw new Error('No valid answer for ' + key);
+        if (Object.prototype.hasOwnProperty.call(answerKey, key)) throw new Error('Duplicate question ' + key);
+        answerKey[key] = answer;
+        questions.push({ key, text: q.text, options: q.options });
+      });
+    });
+    return { questions, answerKey };
+  }
+
+  /** "SCRUM-4821" for a topic, "ROOM-4821" for mixed/no topic (today's format). */
+  function buildRoomId(topicId, suffix) {
+    if (typeof topicId !== 'string' || !TOPIC_ID_PATTERN.test(topicId)) return 'ROOM-' + suffix;
+    return topicId.slice(0, ROOM_PREFIX_MAX).toUpperCase() + '-' + suffix;
+  }
+
+  /** Restores the remembered topic choice: a manifest id or ALL_TOPICS; anything else -> ALL_TOPICS. */
+  function parseStoredTopic(raw, manifest) {
+    if (typeof raw !== 'string' || !Array.isArray(manifest)) return ALL_TOPICS;
+    return manifest.some((topic) => topic.id === raw) ? raw : ALL_TOPICS;
+  }
+
+  const api = { ALL_TOPICS, parseManifest, namespaceId, buildBank, buildRoomId, parseStoredTopic, clampDwellSec, serializeAutoAdvance, parseAutoAdvance, shouldScheduleAutoAdvance, shouldFireAutoAdvance, dwellRemainingSec, reconnectDelayMs, reconnectDecision, isTargetedElsewhere, isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.QuizRules = api;
 })(typeof window !== 'undefined' ? window : globalThis);

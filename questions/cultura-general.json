@@ -1,0 +1,96 @@
+{
+  "id": "cultura-general",
+  "title": "Cultura general",
+  "questions": [
+    {
+      "id": 11,
+      "text": "¿Qué gas respiramos principalmente para vivir?",
+      "options": { "A": "Dióxido de carbono", "B": "Nitrógeno", "C": "Oxígeno", "D": "Hidrógeno" },
+      "correctAnswer": "C"
+    },
+    {
+      "id": 12,
+      "text": "¿Cuál es el resultado de la raíz cuadrada de 81?",
+      "options": { "A": "7", "B": "8", "C": "9", "D": "10" },
+      "correctAnswer": "C"
+    },
+    {
+      "id": 13,
+      "text": "¿Quién pintó la Mona Lisa?",
+      "options": { "A": "Pablo Picasso", "B": "Leonardo da Vinci", "C": "Vincent van Gogh", "D": "Miguel Ángel" },
+      "correctAnswer": "B"
+    },
+    {
+      "id": 14,
+      "text": "¿Cuál es el océano más grande del mundo?",
+      "options": { "A": "Atlántico", "B": "Índico", "C": "Pacífico", "D": "Ártico" },
+      "correctAnswer": "C"
+    },
+    {
+      "id": 15,
+      "text": "¿Cuánto es 12 x 6?",
+      "options": { "A": "66", "B": "72", "C": "78", "D": "84" },
+      "correctAnswer": "B"
+    },
+    {
+      "id": 16,
+      "text": "¿Quién escribió \"Don Quijote de la Mancha\"?",
+      "options": { "A": "Miguel de Cervantes", "B": "Gabriel García Márquez", "C": "Jorge Luis Borges", "D": "Pablo Neruda" },
+      "correctAnswer": "A"
+    },
+    {
+      "id": 17,
+      "text": "¿Cuál es el hueso más largo del cuerpo humano?",
+      "options": { "A": "Húmero", "B": "Fémur", "C": "Tibia", "D": "Radio" },
+      "correctAnswer": "B"
+    },
+    {
+      "id": 18,
+      "text": "¿En qué continente está Egipto?",
+      "options": { "A": "Asia", "B": "Europa", "C": "África", "D": "Oceanía" },
+      "correctAnswer": "C"
+    },
+    {
+      "id": 19,
+      "text": "¿Cuál es el resultado de 15 - 7?",
+      "options": { "A": "6", "B": "7", "C": "8", "D": "9" },
+      "correctAnswer": "C"
+    },
+    {
+      "id": 20,
+      "text": "¿Cuál es la moneda oficial de Japón?",
+      "options": { "A": "Yuan", "B": "Won", "C": "Yen", "D": "Ringgit" },
+      "correctAnswer": "C"
+    },
+    {
+      "id": 21,
+      "text": "¿Qué planeta es conocido como el planeta rojo?",
+      "options": { "A": "Venus", "B": "Marte", "C": "Júpiter", "D": "Saturno" },
+      "correctAnswer": "B"
+    },
+    {
+      "id": 22,
+      "text": "¿Cuántos lados tiene un hexágono?",
+      "options": { "A": "5", "B": "6", "C": "7", "D": "8" },
+      "correctAnswer": "B"
+    },
+    {
+      "id": 23,
+      "text": "¿Quién fue el primer presidente de Argentina?",
+      "options": { "A": "Bernardino Rivadavia", "B": "Domingo Sarmiento", "C": "Julio A. Roca", "D": "Justo José de Urquiza" },
+      "correctAnswer": "A"
+    },
+    {
+      "id": 24,
+      "text": "¿Cuál es el metal líquido a temperatura ambiente?",
+      "options": { "A": "Hierro", "B": "Mercurio", "C": "Aluminio", "D": "Plomo" },
+      "correctAnswer": "B"
+    },
+    {
+      "id": 25,
+      "text": "¿Cuánto es la mitad de 90?",
+      "options": { "A": "40", "B": "45", "C": "35", "D": "50" },
+      "correctAnswer": "B"
+    }
+  ]
+}

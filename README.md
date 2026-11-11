@@ -77,34 +77,48 @@ Al terminar el quiz, el docente puede lanzar una **ronda extra de habilidad** pa
 
 ## Cómo editar el banco de preguntas
 
-Las preguntas se editan en **un solo archivo**, `questions-source.json` — pregunta, opciones A-D y respuesta correcta juntos, todo en el mismo lugar:
+Las preguntas se organizan **por tema**: hay un archivo por tema en la carpeta `questions/` (hoy `scrum.json`, `programacion.json` y `cultura-general.json`). Cada archivo tiene el `id` del tema (solo minúsculas, números y guiones), su `title` y la lista de preguntas — pregunta, opciones A-D y respuesta correcta juntos, todo en el mismo lugar:
 
 ```json
 {
-  "id": 9,
-  "text": "¿Cuál es la capital de Francia?",
-  "options": { "A": "Madrid", "B": "París", "C": "Roma", "D": "Berlín" },
-  "correctAnswer": "B"
+  "id": "cultura-general",
+  "title": "Cultura general",
+  "questions": [
+    {
+      "id": 9,
+      "text": "¿Cuál es la capital de Francia?",
+      "options": { "A": "Madrid", "B": "París", "C": "Roma", "D": "Berlín" },
+      "correctAnswer": "B"
+    }
+  ]
 }
 ```
 
-Después de editar `questions-source.json`, corré:
+Después de editar cualquier archivo de `questions/`, corré:
 
 ```bash
 node scripts/generate-questions.mjs
 ```
 
-Esto regenera `questions-public.js` y `answers.json` a partir de la fuente, validando de paso que no haya `id` duplicados, que las 4 opciones estén completas y que `correctAnswer` sea A/B/C/D — si algo está mal, el script corta con un mensaje señalando la pregunta exacta, en vez de dejarte con los dos archivos desincronizados.
+Esto regenera la carpeta `banks/` a partir de las fuentes, validando de paso que los `id` de tema sean únicos y válidos, que no haya `id` de pregunta duplicados dentro de un tema, que las 4 opciones estén completas y que `correctAnswer` sea A/B/C/D — si algo está mal, el script corta con un mensaje señalando el archivo y la pregunta exactas, en vez de dejarte con archivos desincronizados.
 
-**`questions-public.js`** y **`answers.json`** ahora son **archivos generados** (dice "GENERATED FILE" en el header de `questions-public.js`) — no hace falta editarlos a mano, y si lo hacés, el próximo `generate-questions.mjs` los va a pisar.
+**Para agregar un tema nuevo:** creá un archivo nuevo en `questions/` (por ejemplo `questions/historia.json`, con su `id`, `title` y `questions`) y corré el generador. Aparece solo en el selector, sin tocar `app.js`. Los `id` de pregunta solo tienen que ser únicos dentro de su tema (pueden repetirse entre temas).
+
+**`banks/`** es una carpeta **generada** (tiene un `README.md` que lo avisa) — no hace falta editarla a mano, y si lo hacés, el próximo `generate-questions.mjs` la reconstruye de cero. Contiene `index.json` (la lista de temas con su cantidad de preguntas) y, por tema, `<tema>.questions.json` (enunciados y opciones, sin respuestas) y `<tema>.answers.json` (las respuestas).
+
+### Elegir el tema al armar la sala
+
+En el formulario **"Host a Board"**, antes de clickear "Start Hosting", elegí el tema en el selector **"Question topic"**: un tema puntual o **"All topics (mixed)"**, que mezcla todos (por defecto, o el último que elegiste: se recuerda en el navegador del host). El tema se bloquea cuando la sala está creada, y se muestra en el board junto al Room ID. Si no se pueden cargar las preguntas, se muestra un error y no se crea la sala.
+
+Con un tema puntual, el **Room ID** lleva el nombre del tema como prefijo, por ejemplo `SCRUM-4821`; con "All topics" queda el formato de siempre (`ROOM-4821`). Los estudiantes no eligen ni cargan nada: usan el Room ID que les pasás y el host les envía cada pregunta.
 
 ### ¿Por qué siguen siendo dos archivos separados?
 
-`questions-public.js` (con el enunciado y las opciones) se carga en el navegador de **todos** — docente y estudiantes — apenas se abre la app. `answers.json` (con la respuesta correcta) **no** se carga automáticamente para nadie: solo se pide (`fetch`) desde el navegador del docente, recién al hacer click en "Start Hosting". Separar la respuesta correcta evita que cualquiera que abra la consola del navegador vea todas las respuestas de antemano.
+Los enunciados y opciones (`<tema>.questions.json`) y las respuestas correctas (`<tema>.answers.json`) viven en archivos distintos, y el navegador del **docente** solo pide los del tema elegido, recién al hacer click en "Start Hosting". Los estudiantes **no** cargan ningún banco ni ninguna respuesta al abrir la app. Separar la respuesta correcta evita que cualquiera que abra la consola del navegador vea todas las respuestas de antemano.
 
-**Ojo:** esto sigue siendo una mitigación, no seguridad real. Como es un sitio 100% estático sin backend, no hay forma de ocultarle un archivo a alguien que sepa pedirlo directamente por URL (un estudiante técnicamente decidido podría igual entrar a `.../answers.json` a mano). El generador no cambia esa garantía — solo evita que la separación se rompa por un error de tipeo al mantener los dos archivos a mano. Si el docente necesita una garantía real de que las respuestas no se puedan ver, hace falta un backend — eso queda fuera del alcance de este proyecto.
+**Ojo:** esto sigue siendo una mitigación, no seguridad real. Como es un sitio 100% estático sin backend, no hay forma de ocultarle un archivo a alguien que sepa pedirlo directamente por URL (un estudiante técnicamente decidido podría igual entrar a `.../banks/<tema>.answers.json` a mano). El generador no cambia esa garantía — solo evita que la separación se rompa por un error de tipeo al mantener los archivos a mano. Si el docente necesita una garantía real de que las respuestas no se puedan ver, hace falta un backend — eso queda fuera del alcance de este proyecto.
 
-El juego arranca con **25 preguntas de ejemplo** (programación básica, SCRUM y cultura general). El orden es **aleatorio** (no repite ninguna hasta usar las 25), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas que quieras en `questions-source.json` siguiendo el mismo formato, sin tocar `app.js`.
+El juego arranca con **25 preguntas de ejemplo** repartidas en tres temas: SCRUM (8), programación básica (2) y cultura general (15). El orden es **aleatorio** (no repite ninguna hasta usar todas las del tema elegido, o las 25 en modo mixto), y recién ahí vuelve a mezclar el mazo para la siguiente vuelta — así que con una clase de 40 alumnos y varias rondas, no es tan predecible ni se repite tan rápido como con un orden fijo. Podés agregar todas las preguntas y temas que quieras en `questions/` siguiendo el mismo formato, sin tocar `app.js`.
 
 ## Limitaciones conocidas
 
@@ -113,6 +127,6 @@ El juego arranca con **25 preguntas de ejemplo** (programación básica, SCRUM y
 - El relay está desplegado en `https://avatar-board-relay.onrender.com` (Render free tier) — ver `server/README.md` para redeploy o cambio de URL si hace falta.
 - Si un estudiante real se une **después** de activar el simulador, el simulador no genera estudiantes mock nuevos (no se mezclan automáticamente).
 - Si un estudiante pierde la conexión (por ejemplo, se le apaga la pantalla), su celular intenta reconectarse solo con el mismo alias y el host le reenvía el estado actual; mientras tanto no se marca como desconectado en el board del host. Si el host recarga la página o hace **Reset**, la lista de estudiantes se pierde y todos deben volver a unirse.
-- La separación entre `questions-public.js` y `answers.json` es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.
+- La separación entre `<tema>.questions.json` y `<tema>.answers.json` (en `banks/`) es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.
 - La ronda bonus (Husky Jump) es una feature nueva — probada con grupos chicos, todavía no con una clase completa jugándola en simultáneo. El arte del husky y los conos son formas simples dibujadas en canvas, no ilustraciones.
 - Los efectos de sonido de la ronda bonus (salto/choque) dependen de que el navegador permita reproducir audio — algunos navegadores mobile lo bloquean sin una interacción previa del usuario en esa página; si no se escucha nada, revisá que el celular no esté en silencio antes de asumir que es un bug.

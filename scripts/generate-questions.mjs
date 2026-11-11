@@ -1,135 +1,151 @@
 #!/usr/bin/env node
-// Generates questions-public.js and answers.json from the single source of
-// truth questions-source.json. Run this after editing questions-source.json
-// instead of hand-editing the two generated files.
+// Generates the banks/ folder from the per-topic sources in questions/*.json.
+// Run this after editing (or adding) a file in questions/ instead of
+// hand-editing anything under banks/.
 //
-// The split between questions-public.js (loaded by every browser) and
-// answers.json (fetched only by the host, only once hosting starts) stays
-// exactly as documented in README.md — this script just automates keeping
-// both in sync with one edit instead of two.
+// Output:
+//   banks/index.json                  manifest [{ id, title, count }], sorted by title
+//   banks/<id>.questions.json         [{ id, text, options }]   (NO answers)
+//   banks/<id>.answers.json           { "<id>": "A".."D" }
+//
+// The questions/answers split stays exactly as documented in README.md: the
+// browser only ever requests the .answers.json of the topic the host picked,
+// and only once hosting starts.
 'use strict';
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const SOURCE_PATH = path.join(ROOT, 'questions-source.json');
-const PUBLIC_PATH = path.join(ROOT, 'questions-public.js');
-const ANSWERS_PATH = path.join(ROOT, 'answers.json');
+const SOURCE_DIR = path.join(ROOT, 'questions');
+const OUT_DIR = path.join(ROOT, 'banks');
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
+const TOPIC_ID_PATTERN = /^[a-z0-9-]+$/;
 
 function fail(message) {
   console.error(`generate-questions: ${message}`);
   process.exit(1);
 }
 
-function loadSource() {
-  let raw;
+function loadTopics() {
+  let files;
   try {
-    raw = readFileSync(SOURCE_PATH, 'utf8');
+    files = readdirSync(SOURCE_DIR)
+      .filter((name) => name.endsWith('.json'))
+      .sort();
   } catch (err) {
-    fail(`could not read ${SOURCE_PATH}: ${err.message}`);
+    fail(`could not read ${SOURCE_DIR}: ${err.message}`);
   }
+  if (files.length === 0) fail(`${SOURCE_DIR} has no *.json topic files`);
 
-  let questions;
-  try {
-    questions = JSON.parse(raw);
-  } catch (err) {
-    fail(`${SOURCE_PATH} is not valid JSON: ${err.message}`);
-  }
-
-  if (!Array.isArray(questions) || questions.length === 0) {
-    fail(`${SOURCE_PATH} must be a non-empty JSON array of questions`);
-  }
-
-  return questions;
+  return files.map((name) => {
+    const file = path.join(SOURCE_DIR, name);
+    let topic;
+    try {
+      topic = JSON.parse(readFileSync(file, 'utf8'));
+    } catch (err) {
+      fail(`questions/${name} is not valid JSON: ${err.message}`);
+    }
+    return { file: `questions/${name}`, topic };
+  });
 }
 
-function validate(questions) {
+function validateQuestions(where, questions) {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    fail(`${where}: "questions" must be a non-empty array`);
+  }
   const seenIds = new Set();
 
   questions.forEach((q, index) => {
-    const where = `questions-source.json[${index}] (id: ${q && q.id})`;
+    const label = `${where}.questions[${index}] (id: ${q && q.id})`;
+    if (!q || typeof q !== 'object') fail(`${label}: must be an object`);
 
     if (typeof q.id !== 'number' || !Number.isInteger(q.id)) {
-      fail(`${where}: "id" must be an integer`);
+      fail(`${label}: "id" must be an integer`);
     }
     if (seenIds.has(q.id)) {
-      fail(`${where}: duplicate id ${q.id}`);
+      fail(`${label}: duplicate id ${q.id} within this topic`);
     }
     seenIds.add(q.id);
 
     if (typeof q.text !== 'string' || q.text.trim().length === 0) {
-      fail(`${where}: "text" must be a non-empty string`);
+      fail(`${label}: "text" must be a non-empty string`);
     }
 
     if (!q.options || typeof q.options !== 'object') {
-      fail(`${where}: "options" must be an object with keys A-D`);
+      fail(`${label}: "options" must be an object with keys A-D`);
     }
     OPTION_KEYS.forEach((key) => {
       if (typeof q.options[key] !== 'string' || q.options[key].trim().length === 0) {
-        fail(`${where}: options.${key} must be a non-empty string`);
+        fail(`${label}: options.${key} must be a non-empty string`);
       }
     });
 
     if (!OPTION_KEYS.includes(q.correctAnswer)) {
-      fail(`${where}: "correctAnswer" must be one of ${OPTION_KEYS.join('/')}, got ${JSON.stringify(q.correctAnswer)}`);
+      fail(`${label}: "correctAnswer" must be one of ${OPTION_KEYS.join('/')}, got ${JSON.stringify(q.correctAnswer)}`);
     }
   });
 }
 
-function jsStringLiteral(value) {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-}
-
-function buildQuestionsPublicJs(questions) {
-  const entries = questions
-    .map((q) => {
-      const options = OPTION_KEYS.map((key) => `${key}: ${jsStringLiteral(q.options[key])}`).join(', ');
-      return `  {\n    id: ${q.id},\n    text: ${jsStringLiteral(q.text)},\n    options: { ${options} },\n  },`;
-    })
-    .join('\n');
-
-  return `'use strict';
-
-/**
- * Interactive Avatar Board — questions-public.js
- * GENERATED FILE — do not edit by hand. Edit questions-source.json and run
- * \`node scripts/generate-questions.mjs\` instead (see README.md).
- *
- * Pre-configured question bank (PUBLIC part). Loaded before app.js (see
- * index.html) into EVERY visitor's browser (host and students alike).
- *
- * This file intentionally does NOT contain \`correctAnswer\` — that field
- * lives in the separate \`answers.json\` file, which is fetched only by the
- * host's code path, only once hosting actually starts (see initHostPeer()
- * in app.js). See README.md for why this is split and what it does/doesn't
- * protect against.
- */
-const QUESTIONS_PUBLIC = [
-${entries}
-];
-`;
-}
-
-function buildAnswersJson(questions) {
-  const answers = {};
-  questions.forEach((q) => {
-    answers[String(q.id)] = q.correctAnswer;
+function validate(entries) {
+  const seenTopicIds = new Set();
+  entries.forEach(({ file, topic }) => {
+    if (!topic || typeof topic !== 'object' || Array.isArray(topic)) {
+      fail(`${file}: must be a JSON object { id, title, questions }`);
+    }
+    if (typeof topic.id !== 'string' || !TOPIC_ID_PATTERN.test(topic.id)) {
+      fail(`${file}: "id" must be a slug matching ${TOPIC_ID_PATTERN}, got ${JSON.stringify(topic.id)}`);
+    }
+    if (seenTopicIds.has(topic.id)) {
+      fail(`${file}: duplicate topic id "${topic.id}"`);
+    }
+    seenTopicIds.add(topic.id);
+    if (typeof topic.title !== 'string' || topic.title.trim().length === 0) {
+      fail(`${file}: "title" must be a non-empty string`);
+    }
+    validateQuestions(file, topic.questions);
   });
-  return `${JSON.stringify(answers, null, 2)}\n`;
+}
+
+function writeJson(file, value) {
+  writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function main() {
-  const questions = loadSource();
-  validate(questions);
+  const entries = loadTopics();
+  validate(entries);
 
-  writeFileSync(PUBLIC_PATH, buildQuestionsPublicJs(questions));
-  writeFileSync(ANSWERS_PATH, buildAnswersJson(questions));
+  // Start from a clean folder so a removed/renamed topic leaves no stale files.
+  rmSync(OUT_DIR, { recursive: true, force: true });
+  mkdirSync(OUT_DIR, { recursive: true });
 
-  console.log(`Generated questions-public.js and answers.json from ${questions.length} question(s).`);
+  const manifest = entries
+    .map(({ topic }) => ({ id: topic.id, title: topic.title, count: topic.questions.length }))
+    .sort((a, b) => a.title.localeCompare(b.title, 'es'));
+
+  entries.forEach(({ topic }) => {
+    const publicQuestions = topic.questions.map((q) => ({ id: q.id, text: q.text, options: q.options }));
+    const answers = {};
+    topic.questions.forEach((q) => {
+      answers[String(q.id)] = q.correctAnswer;
+    });
+    writeJson(path.join(OUT_DIR, `${topic.id}.questions.json`), publicQuestions);
+    writeJson(path.join(OUT_DIR, `${topic.id}.answers.json`), answers);
+  });
+  writeJson(path.join(OUT_DIR, 'index.json'), manifest);
+
+  writeFileSync(
+    path.join(OUT_DIR, 'README.md'),
+    'GENERATED FOLDER - do not edit by hand.\n\n' +
+      'Edit the topic files in `questions/` and run `node scripts/generate-questions.mjs`; ' +
+      'this folder is rebuilt from scratch every time.\n'
+  );
+
+  const total = manifest.reduce((sum, t) => sum + t.count, 0);
+  console.log(`Generated banks/ for ${manifest.length} topic(s), ${total} question(s):`);
+  manifest.forEach((t) => console.log(`  ${t.id}: ${t.count}`));
 }
 
 main();

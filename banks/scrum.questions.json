@@ -1,0 +1,82 @@
+[
+  {
+    "id": 3,
+    "text": "¿Qué es SCRUM?",
+    "options": {
+      "A": "Un lenguaje de programación.",
+      "B": "Un marco de trabajo ágil para desarrollar productos.",
+      "C": "Un tipo de base de datos.",
+      "D": "Un sistema operativo."
+    }
+  },
+  {
+    "id": 4,
+    "text": "¿Cuáles son los tres roles de un equipo SCRUM?",
+    "options": {
+      "A": "Product Owner, Scrum Master y Developers.",
+      "B": "Jefe, Programador y Tester.",
+      "C": "Cliente, Gerente y Diseñador.",
+      "D": "Líder, Analista y Soporte."
+    }
+  },
+  {
+    "id": 5,
+    "text": "En SCRUM, ¿qué es un Sprint?",
+    "options": {
+      "A": "Una reunión diaria del equipo.",
+      "B": "La lista de tareas del proyecto.",
+      "C": "Un periodo fijo (máx. un mes) para crear un incremento.",
+      "D": "El documento final del producto."
+    }
+  },
+  {
+    "id": 6,
+    "text": "¿Quién gestiona el Product Backlog y maximiza el valor del producto?",
+    "options": {
+      "A": "El Scrum Master",
+      "B": "Los Developers",
+      "C": "El cliente",
+      "D": "El Product Owner"
+    }
+  },
+  {
+    "id": 7,
+    "text": "¿Cuánto dura como máximo la Daily Scrum?",
+    "options": {
+      "A": "15 minutos",
+      "B": "30 minutos",
+      "C": "1 hora",
+      "D": "4 horas"
+    }
+  },
+  {
+    "id": 8,
+    "text": "¿Cuál es la función principal del Scrum Master?",
+    "options": {
+      "A": "Escribir todo el código.",
+      "B": "Decidir qué se construye.",
+      "C": "Guiar al equipo en SCRUM y remover impedimentos.",
+      "D": "Aprobar el presupuesto."
+    }
+  },
+  {
+    "id": 9,
+    "text": "¿Qué es el Product Backlog?",
+    "options": {
+      "A": "Un informe de errores.",
+      "B": "El calendario de reuniones.",
+      "C": "El código fuente del proyecto.",
+      "D": "Una lista ordenada de lo necesario para mejorar el producto."
+    }
+  },
+  {
+    "id": 10,
+    "text": "¿En qué evento el equipo reflexiona sobre cómo mejorar su forma de trabajar?",
+    "options": {
+      "A": "Sprint Planning",
+      "B": "Sprint Retrospective",
+      "C": "Daily Scrum",
+      "D": "Sprint Review"
+    }
+  }
+]

@@ -90,8 +90,20 @@ function initViewToggles() {
   if (formHost) {
     formHost.addEventListener('submit', (event) => {
       event.preventDefault();
-      setHostStatus('Connecting...');
-      initHostSocket();
+      if (gameState.hostStarting || gameState.hostSocket) return;
+      gameState.hostStarting = true;
+      setTopicSelectLocked(true);
+      setHostStatus('Loading questions...');
+      loadSelectedBank().then((loaded) => {
+        gameState.hostStarting = false;
+        if (!loaded) {
+          setHostStatus('');
+          setTopicSelectLocked(false);
+          return;
+        }
+        setHostStatus('Connecting...');
+        initHostSocket();
+      });
     });
   }
 
@@ -209,7 +221,7 @@ const gameState = {
   students: [], // { id, name, avatar, avatarImage, isMock }
   questionStartedAt: null,
   questionId: 0,
-  // Shuffle-bag ordering over QUESTIONS_PUBLIC: questionOrder holds a
+  // Shuffle-bag ordering over gameState.bank: questionOrder holds a
   // shuffled permutation of bank indices, questionPointer advances through
   // it. Every question is shown exactly once before any repeats, and the
   // bag reshuffles (with a fresh random order) once exhausted — see
@@ -241,9 +253,16 @@ const gameState = {
   hostSocket: null, // host: this device's WebSocket connection to the relay
   roomId: null, // host: the Room ID registered with the relay
   // Correct-answer key ({ [questionId]: 'A'|'B'|'C'|'D' }), fetched lazily
-  // from answers.json ONLY on the host code path (see initHostSocket()), so
+  // from banks/<topic>.answers.json ONLY on the host code path (see loadSelectedBank()), so
   // students never load it just by opening the app. null until fetched.
   answerKey: null,
+  // Question bank for this hosting session, loaded at Start Hosting from the
+  // topic picked in the setup form (see loadSelectedBank()). Entries are
+  // { key: '<topic>:<id>', text, options }; answerKey is keyed the same way.
+  bank: [],
+  topics: null, // manifest from banks/index.json: [{ id, title, count }], null until loaded
+  topic: null, // { id: string|null, title } of the active hosting session (id null = mixed)
+  hostStarting: false, // guards against double-submit of the host form while the bank loads
   relaySocket: null, // student: this device's WebSocket connection to the relay
   clientSession: null, // student: { roomId, studentId, avatar, avatarImage, stopped, attempt, timerId } — drives auto-reconnect
   wakeLock: null, // student: active screen WakeLockSentinel, if any
@@ -541,15 +560,15 @@ function shuffleArray(array) {
 }
 
 /**
- * Draws the next question from QUESTIONS_PUBLIC using a shuffle bag: a
+ * Draws the next question from gameState.bank using a shuffle bag: a
  * freshly shuffled permutation of bank indices is consumed one at a time,
  * guaranteeing every question appears exactly once before any repeats. Once
  * the bag is exhausted (or the bank size changed, e.g. after editing
- * questions-public.js), it's reshuffled with a new random order.
+ * the active bank), it's reshuffled with a new random order.
  * @returns {object|null} the next question object, or null if the bank is empty/missing
  */
 function drawNextQuestion() {
-  const bank = typeof QUESTIONS_PUBLIC !== 'undefined' && QUESTIONS_PUBLIC.length > 0 ? QUESTIONS_PUBLIC : null;
+  const bank = gameState.bank.length > 0 ? gameState.bank : null;
   if (!bank) return null;
 
   if (gameState.questionOrder.length !== bank.length || gameState.questionPointer >= gameState.questionOrder.length) {
@@ -578,14 +597,14 @@ function startNewQuestionRound() {
   setGameState(GAME_STATES.ACTIVE_QUESTION);
 
   // Pull the next question from the pre-configured public bank
-  // (questions-public.js) via the shuffle bag (drawNextQuestion), and
+  // (gameState.bank) via the shuffle bag (drawNextQuestion), and
   // pre-fill the host's "Correct Answer" select by looking up the answer key
-  // (answers.json, fetched lazily in initHostSocket()) — still overridable
+  // (banks/<topic>.answers.json, fetched in loadSelectedBank()) — still overridable
   // manually afterwards.
   const question = drawNextQuestion();
 
   if (question) {
-    const correctAnswer = gameState.answerKey ? gameState.answerKey[question.id] : undefined;
+    const correctAnswer = gameState.answerKey ? gameState.answerKey[question.key] : undefined;
     if (!gameState.answerKey) {
       console.warn('Answer key not loaded yet — Correct Answer will not auto-populate this round.');
     }
@@ -1613,7 +1632,128 @@ const HOST_WAKE_TIMEOUT_MS = 90000;
  */
 function generateRoomId() {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `ROOM-${suffix}`;
+  return window.QuizRules.buildRoomId(gameState.topic && gameState.topic.id, suffix);
+}
+
+// ---------------------------------------------------------------------------
+// Topic banks (host only): banks/index.json lists the topics; at Start Hosting
+// only the chosen topic's questions + answers are fetched (all of them for the
+// mixed "All topics" option). Students never load a bank — the host sends the
+// question text/options in START_QUESTION.
+// ---------------------------------------------------------------------------
+
+const TOPIC_STORAGE_KEY = 'questionTopic';
+
+function setTopicStatus(text) {
+  const el = document.getElementById('host-topic-status');
+  if (el) el.textContent = text;
+}
+
+function setTopicSelectLocked(locked) {
+  const select = document.getElementById('input-topic');
+  if (select && gameState.topics) select.disabled = locked;
+}
+
+async function fetchBankJson(url) {
+  const response = await fetch(url, { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  return response.json();
+}
+
+/** Populates the topic selector from banks/index.json (setup view, host form). */
+async function initTopicSelector() {
+  const select = document.getElementById('input-topic');
+  const startButton = document.getElementById('btn-start-hosting');
+  if (!select) return;
+  try {
+    const manifest = window.QuizRules.parseManifest(await fetchBankJson('banks/index.json'));
+    if (!manifest) throw new Error('banks/index.json has no valid topics');
+    gameState.topics = manifest;
+
+    select.innerHTML = '';
+    const addOption = (value, label) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    };
+    const total = manifest.reduce((sum, topic) => sum + topic.count, 0);
+    addOption(window.QuizRules.ALL_TOPICS, `All topics (mixed) - ${total}`);
+    manifest.forEach((topic) => addOption(topic.id, `${topic.title} - ${topic.count}`));
+
+    let stored = null;
+    try {
+      stored = localStorage.getItem(TOPIC_STORAGE_KEY);
+    } catch (err) {
+      stored = null;
+    }
+    select.value = window.QuizRules.parseStoredTopic(stored, manifest);
+    select.disabled = false;
+    if (startButton) startButton.disabled = false;
+    setTopicStatus('');
+
+    select.addEventListener('change', () => {
+      try {
+        localStorage.setItem(TOPIC_STORAGE_KEY, select.value);
+      } catch (err) {
+        // Storage unavailable: the choice still applies to this session.
+      }
+    });
+  } catch (err) {
+    console.error('Failed to load banks/index.json:', err);
+    select.innerHTML = '<option value="*">Topics unavailable</option>';
+    select.disabled = true;
+    if (startButton) startButton.disabled = true;
+    setTopicStatus('Could not load the question topics, so hosting is disabled. Reload the page to try again.');
+  }
+}
+
+/**
+ * Fetches the selected topic's (or every topic's) questions + answers and
+ * makes them the active bank. Resolves false (with a visible message) on any
+ * failure — never leaves the host with a silently empty bank.
+ * @returns {Promise<boolean>}
+ */
+async function loadSelectedBank() {
+  const select = document.getElementById('input-topic');
+  const manifest = gameState.topics;
+  if (!select || !manifest) {
+    setTopicStatus('Question topics are not loaded yet.');
+    return false;
+  }
+  const choice = select.value;
+  const chosen = choice === window.QuizRules.ALL_TOPICS ? manifest : manifest.filter((topic) => topic.id === choice);
+  if (chosen.length === 0) {
+    setTopicStatus('Pick a topic first.');
+    return false;
+  }
+  try {
+    const topics = await Promise.all(
+      chosen.map(async (topic) => {
+        const [questions, answers] = await Promise.all([
+          fetchBankJson(`banks/${topic.id}.questions.json`),
+          fetchBankJson(`banks/${topic.id}.answers.json`),
+        ]);
+        return { id: topic.id, questions, answers };
+      })
+    );
+    const built = window.QuizRules.buildBank(topics);
+    if (built.questions.length === 0) throw new Error('empty bank');
+    gameState.bank = built.questions;
+    gameState.answerKey = built.answerKey;
+    gameState.questionOrder = [];
+    gameState.questionPointer = 0;
+    gameState.topic =
+      choice === window.QuizRules.ALL_TOPICS
+        ? { id: null, title: 'All topics (mixed)' }
+        : { id: chosen[0].id, title: chosen[0].title };
+    setTopicStatus('');
+    return true;
+  } catch (err) {
+    console.error('Failed to load the question bank:', err);
+    setTopicStatus('Could not load the question bank. Check your connection and try again.');
+    return false;
+  }
 }
 
 function setHostStatus(text) {
@@ -1730,20 +1870,8 @@ function resizeAvatarImageToDataUrl(file) {
  * @param {number} [attempt]
  */
 function initHostSocket(attempt = 0) {
-  // Lazily fetch the correct-answer key — ONLY on the host code path, ONLY
-  // when hosting actually starts, and only once per session (not on every
-  // question). Students never trigger this fetch just by opening the app.
-  if (!gameState.answerKey) {
-    fetch('answers.json')
-      .then((response) => response.json())
-      .then((data) => {
-        gameState.answerKey = data;
-      })
-      .catch((err) => {
-        console.error('Failed to load answers.json:', err);
-      });
-  }
-
+  // The question bank and its answer key were already fetched by
+  // loadSelectedBank() (host code path only, only for the chosen topic).
   const roomId = generateRoomId();
   const socket = new WebSocket(RELAY_URL);
 
@@ -1752,6 +1880,7 @@ function initHostSocket(attempt = 0) {
   }, HOST_WAKE_HINT_MS);
   const wakeTimeoutTimer = setTimeout(() => {
     setHostStatus('Connection error: relay server unreachable');
+    setTopicSelectLocked(false);
     socket.close();
   }, HOST_WAKE_TIMEOUT_MS);
   const clearWakeTimers = () => {
@@ -1779,6 +1908,11 @@ function initHostSocket(attempt = 0) {
       setHostStatus(roomId);
       const badge = document.getElementById('board-room-id');
       if (badge) badge.textContent = `Room: ${roomId}`;
+      const topicBadge = document.getElementById('board-topic');
+      if (topicBadge && gameState.topic) {
+        topicBadge.textContent = `Topic: ${gameState.topic.title}`;
+        topicBadge.hidden = false;
+      }
       navigateTo('board');
       return;
     }
@@ -1794,6 +1928,7 @@ function initHostSocket(attempt = 0) {
       clearWakeTimers();
       console.error('Relay host error:', code);
       setHostStatus(`Connection error: ${code || 'unknown'}`);
+      setTopicSelectLocked(false);
       return;
     }
 
@@ -1816,6 +1951,7 @@ function initHostSocket(attempt = 0) {
  */
 function destroyHostSocket() {
   cancelAutoAdvance();
+  setTopicSelectLocked(false);
   if (gameState.hostSocket) {
     gameState.hostSocket.close();
     gameState.hostSocket = null;
@@ -2641,6 +2777,7 @@ function endBonusRound() {
 function init() {
   initRouter();
   initViewToggles();
+  initTopicSelector();
   initDashboardControls();
   initControllerOptions();
 }
