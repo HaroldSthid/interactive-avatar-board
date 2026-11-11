@@ -15,6 +15,35 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 7. Click en **"Finalizar sesión"** en cualquier momento (excepto en LOBBY) para cerrar la sesión y mostrar el ranking final acumulado, tanto en el board como en el celular de cada estudiante.
 8. Click en **"Reset"** para reiniciar toda la sesión (vuelve al banco de preguntas desde el principio y borra el puntaje acumulado), incluso después de "Finalizar sesión".
 
+### Flujo rápido del host (resumen)
+
+Son botones distintos para fases distintas — no se reemplazan entre sí:
+
+1. **Start Game** — arranca el quiz (solo funciona desde el lobby).
+2. **End Question / Next Question** — es el mismo botón: durante la pregunta termina la ronda y muestra el leaderboard; después, pasa a la siguiente. Cuando se acaba el cronómetro la pregunta termina sola, pero **no avanza sola**: hay que clickear "Next Question".
+3. **Finalizar sesión** — cierra el quiz y muestra el ranking final.
+4. **Start Bonus Round** — se habilita solo después de "Finalizar sesión"; lanza el juego para los finalistas (se juega tocando la pantalla del celular para saltar).
+5. **Download results** — descarga el CSV, desde el ranking final o desde los resultados del bonus.
+6. **Reset** — borra la sesión y vuelve al lobby (los estudiantes tienen que volver a unirse).
+
+### Regla de alias (identificar a los estudiantes)
+
+En la barra del host, antes de empezar, podés elegir cómo se valida el alias con el que se unen los estudiantes:
+
+- **Any alias** (por defecto): cualquier alias.
+- **Student ID prefix**: el alias debe empezar con el ID de estudiante (cantidad de dígitos configurable, 10 por defecto) seguido de `_`, por ejemplo `0000298552_Shadow`.
+- **Custom regex**: una expresión regular propia, útil para otras universidades o empresas.
+
+Si el alias no cumple, el estudiante ve el motivo y no puede participar. La regla se bloquea al iniciar la sesión y se recuerda en el navegador del host. Solo valida el **formato**, no que el ID exista en tu lista.
+
+### Descargar resultados (CSV)
+
+Con el botón **"Download results"** se baja un CSV con: `student_id`, `alias`, `correct_answers`, `total_questions`, `speed_points`, `rank`, `bonus_score` y `bonus_champion`. Notas:
+
+- `correct_answers` cuenta las respuestas correctas; `speed_points` es el puntaje por velocidad (no son lo mismo — para una nota, usá las correctas).
+- El `student_id` conserva los ceros iniciales en Excel (se escribe como texto).
+- Una sesión = un CSV. Si hacés varias rondas, juntá los archivos en una hoja de cálculo.
+
 ## Instrucciones para el estudiante
 
 1. Abrí el mismo link, desde tu propio dispositivo.
@@ -83,7 +112,7 @@ El juego arranca con **25 preguntas de ejemplo** (programación básica, SCRUM y
 - El relay corre en el free tier de Render, que duerme la instancia tras un rato sin tráfico. El servidor se auto-hace ping cada 10 minutos para evitar ese cold start (ver `server/README.md`); si ese mecanismo falla o se desactiva, el primer host de la clase puede tardar hasta ~60s en conectar mientras la instancia se despierta.
 - El relay está desplegado en `https://avatar-board-relay.onrender.com` (Render free tier) — ver `server/README.md` para redeploy o cambio de URL si hace falta.
 - Si un estudiante real se une **después** de activar el simulador, el simulador no genera estudiantes mock nuevos (no se mezclan automáticamente).
-- No hay manejo robusto de desconexión: si un estudiante pierde la conexión, su avatar no se limpia ni se marca automáticamente.
+- Si un estudiante pierde la conexión (por ejemplo, se le apaga la pantalla), su celular intenta reconectarse solo con el mismo alias y el host le reenvía el estado actual; mientras tanto no se marca como desconectado en el board del host. Si el host recarga la página o hace **Reset**, la lista de estudiantes se pierde y todos deben volver a unirse.
 - La separación entre `questions-public.js` y `answers.json` es una mitigación contra exposición casual, no seguridad real (ver arriba) — no hay backend que pueda garantizar que las respuestas queden realmente ocultas.
 - La ronda bonus (Husky Jump) es una feature nueva — probada con grupos chicos, todavía no con una clase completa jugándola en simultáneo. El arte del husky y los conos son formas simples dibujadas en canvas, no ilustraciones.
 - Los efectos de sonido de la ronda bonus (salto/choque) dependen de que el navegador permita reproducir audio — algunos navegadores mobile lo bloquean sin una interacción previa del usuario en esa página; si no se escucha nada, revisá que el celular no esté en silencio antes de asumir que es un bug.
