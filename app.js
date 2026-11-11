@@ -224,6 +224,15 @@ const gameState = {
   // there — and reset alongside the rest of the session in resetGame().
   totalScores: {},
   finalRanking: [], // [{ studentId, score }], set by endSession(), descending by score
+  // Number of correct answers per student (studentId -> number) and how many
+  // questions were scored; both updated in awardRoundPoints(), reset with totalScores.
+  correctCounts: {},
+  totalQuestionsAsked: 0,
+  // Host-chosen alias rule for this session (see quiz-rules.js). `aliasRule`
+  // is the compiled form; `aliasRuleConfig` mirrors the lobby inputs.
+  aliasRuleConfig: { mode: 'any', digits: 10, regex: '' },
+  aliasRule: null, // set by initAliasRuleControls(); null => any alias
+  aliasRejections: 0,
 
   // --- WebSocket relay (Phase 4) ---
   hostSocket: null, // host: this device's WebSocket connection to the relay
@@ -663,6 +672,9 @@ function resetGame() {
   // session", even when triggered from SESSION_END.
   gameState.totalScores = {};
   gameState.finalRanking = [];
+  gameState.correctCounts = {};
+  gameState.totalQuestionsAsked = 0;
+  gameState.aliasRejections = 0;
   // Bonus-round state is ephemeral per session too (design.md §9 Migration /
   // Rollout) — stop any pending host-side timers before wiping the fields so
   // a stray stall check or 180s cap from a previous session can't fire into
@@ -745,6 +757,13 @@ function renderDashboard() {
     btnEndSession.disabled = gameState.current === GAME_STATES.LOBBY || gameState.current === GAME_STATES.SESSION_END;
   }
 
+  // The alias rule can only change before the game starts (back in LOBBY
+  // after Reset), so every student is judged by the same rule.
+  ['input-alias-mode', 'input-alias-digits', 'input-alias-regex'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = gameState.current !== GAME_STATES.LOBBY;
+  });
+
   if (btnStartBonus) {
     btnStartBonus.disabled = gameState.current !== GAME_STATES.SESSION_END;
   }
@@ -802,6 +821,16 @@ function renderLeaderboardPanel() {
  * leaderboard's markup/styling patterns (an <ol> reusing `.leaderboard__list`
  * so the winner-highlight CSS applies), with a trophy prefix on the #1 entry.
  */
+/** "Download results" button shared by the SESSION_END and bonus results views. */
+function createDownloadResultsButton() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn--secondary board-final-ranking__download';
+  btn.textContent = 'Download results';
+  btn.addEventListener('click', downloadResultsCsv);
+  return btn;
+}
+
 function renderFinalRankingPanel() {
   const panel = document.getElementById('board-final-ranking');
   if (!panel) return;
@@ -837,6 +866,8 @@ function renderFinalRankingPanel() {
     list.appendChild(item);
   });
   panel.appendChild(list);
+
+  panel.appendChild(createDownloadResultsButton());
 }
 
 /**
@@ -944,6 +975,7 @@ function renderBonusChampionReveal() {
     empty.className = 'leaderboard__empty';
     empty.textContent = 'No standings recorded.';
     panel.appendChild(empty);
+    panel.appendChild(createDownloadResultsButton());
     return;
   }
 
@@ -956,6 +988,7 @@ function renderBonusChampionReveal() {
     list.appendChild(item);
   });
   panel.appendChild(list);
+  panel.appendChild(createDownloadResultsButton());
 }
 
 /**
@@ -1163,9 +1196,12 @@ function computeLeaderboard() {
  *   correct-only leaderboard (see computeLeaderboard())
  */
 function awardRoundPoints(leaderboard) {
+  gameState.totalQuestionsAsked += 1;
   leaderboard.forEach((entry, index) => {
     const points = leaderboard.length - index;
     gameState.totalScores[entry.studentId] = (gameState.totalScores[entry.studentId] || 0) + points;
+    // Points are speed-ranked, so they don't tell how many answers were right.
+    gameState.correctCounts[entry.studentId] = (gameState.correctCounts[entry.studentId] || 0) + 1;
   });
 }
 
@@ -1204,6 +1240,99 @@ function endSession() {
   broadcastToStudents({ type: MSG_TYPES.SESSION_END, payload: { finalRanking } });
 }
 
+/**
+ * Recompiles the alias rule from the lobby inputs (an invalid custom regex
+ * falls back to "Any alias" with a visible warning) and refreshes the UI.
+ */
+function applyAliasRuleConfig() {
+  const modeSelect = document.getElementById('input-alias-mode');
+  const digitsInput = document.getElementById('input-alias-digits');
+  const regexInput = document.getElementById('input-alias-regex');
+  gameState.aliasRuleConfig = {
+    mode: modeSelect ? modeSelect.value : 'any',
+    digits: digitsInput ? digitsInput.value : 10,
+    regex: regexInput ? regexInput.value : '',
+  };
+  gameState.aliasRule = window.QuizRules.compileAliasRule(gameState.aliasRuleConfig);
+  saveAliasRuleConfig(gameState.aliasRuleConfig);
+  document.getElementById('alias-digits-field')?.toggleAttribute('hidden', gameState.aliasRuleConfig.mode !== 'prefix');
+  document.getElementById('alias-regex-field')?.toggleAttribute('hidden', gameState.aliasRuleConfig.mode !== 'custom');
+  renderAliasRuleHint();
+}
+
+function renderAliasRuleHint() {
+  const hint = document.getElementById('alias-rule-hint');
+  const rule = gameState.aliasRule;
+  if (!hint || !rule) return;
+  const rejected = gameState.aliasRejections > 0 ? ` Rejected joins: ${gameState.aliasRejections}.` : '';
+  hint.textContent = (rule.warning || rule.description) + rejected;
+  hint.dataset.warning = rule.warning ? 'true' : 'false';
+}
+
+const ALIAS_RULE_STORAGE_KEY = 'aliasRuleConfig';
+
+function saveAliasRuleConfig(config) {
+  try {
+    localStorage.setItem(ALIAS_RULE_STORAGE_KEY, window.QuizRules.serializeAliasConfig(config));
+  } catch (err) {
+    // Storage unavailable (private mode, blocked): the rule still works for this session.
+  }
+}
+
+function loadAliasRuleConfig() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(ALIAS_RULE_STORAGE_KEY);
+  } catch (err) {
+    raw = null;
+  }
+  return window.QuizRules.parseAliasConfig(raw);
+}
+
+function initAliasRuleControls() {
+  // Restore the persisted choice into the inputs before the first compile.
+  const stored = loadAliasRuleConfig();
+  const modeSelect = document.getElementById('input-alias-mode');
+  const digitsInput = document.getElementById('input-alias-digits');
+  const regexInput = document.getElementById('input-alias-regex');
+  if (modeSelect) modeSelect.value = stored.mode;
+  if (digitsInput) digitsInput.value = stored.digits;
+  if (regexInput) regexInput.value = stored.regex;
+  ['input-alias-mode', 'input-alias-digits', 'input-alias-regex'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(id === 'input-alias-mode' ? 'change' : 'input', applyAliasRuleConfig);
+  });
+  applyAliasRuleConfig();
+}
+
+/**
+ * Builds the results CSV from the session state and downloads it through a
+ * temporary Blob URL + anchor (revoked right after the click).
+ */
+function downloadResultsCsv() {
+  const rows = window.QuizRules.buildResultRows({
+    finalRanking: gameState.finalRanking,
+    correctCounts: gameState.correctCounts,
+    totalQuestions: gameState.totalQuestionsAsked,
+    bonusStandings: gameState.bonusStandings,
+    bonusChampions: gameState.bonusChampions,
+    rule: gameState.aliasRule,
+  });
+  const csv = window.QuizRules.buildResultsCsv(rows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `quiz-results-${stamp}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function initDashboardControls() {
   const btnStart = document.getElementById('btn-start-game');
   const btnNext = document.getElementById('btn-next-question');
@@ -1227,6 +1356,7 @@ function initDashboardControls() {
     });
   }
 
+  initAliasRuleControls();
   renderDashboard();
   renderRoster();
 }
@@ -1253,6 +1383,9 @@ function initDashboardControls() {
 const MSG_TYPES = {
   JOIN: 'JOIN',
   JOIN_ACK: 'JOIN_ACK',
+  // host -> all (broadcast), payload { studentId, message }: the host refused
+  // this JOIN (alias rule). Only the client whose studentId matches reacts.
+  JOIN_REJECT: 'JOIN_REJECT',
   SUBMIT: 'SUBMIT',
   START_QUESTION: 'START_QUESTION',
   ROUND_END: 'ROUND_END',
@@ -1561,12 +1694,22 @@ function handleHostMessage(message) {
       if (!isValidStudentId(studentId)) return;
       if (avatar !== undefined && !MOCK_AVATARS.includes(avatar)) return;
       if (!isValidAvatarImage(avatarImage)) return;
+      const rule = gameState.aliasRule;
+      if (rule && !rule.test(studentId)) {
+        gameState.aliasRejections += 1;
+        renderAliasRuleHint();
+        broadcastToStudents({ type: MSG_TYPES.JOIN_REJECT, payload: { studentId, message: rule.message } });
+        return;
+      }
       registerRealStudent(studentId, avatar, avatarImage);
       break;
     }
     case MSG_TYPES.SUBMIT: {
       const { studentId, choice, timeElapsedMs } = message.payload || {};
       if (!isValidStudentId(studentId) || !QUADRANTS.includes(choice)) return;
+      // With an alias rule active, a rejected student must not be able to
+      // score by submitting anyway: only registered roster members count.
+      if (gameState.aliasRule && gameState.aliasRule.mode !== 'any' && !gameState.students.some((s) => s.id === studentId)) return;
       const timestamp = (gameState.questionStartedAt || Date.now()) + (timeElapsedMs || 0);
       recordSubmission(studentId, choice, timestamp);
       break;
@@ -1709,6 +1852,17 @@ function handleClientMessage(message) {
   switch (message.type) {
     case MSG_TYPES.JOIN_ACK: {
       setControllerStatus(`Student: ${gameState.studentId} (connected)`);
+      break;
+    }
+    case MSG_TYPES.JOIN_REJECT: {
+      const payload = message.payload || {};
+      if (payload.studentId !== gameState.studentId) break;
+      const reason = typeof payload.message === 'string' && payload.message ? payload.message : 'The host rejected your alias.';
+      setControllerStatus(`Student: ${gameState.studentId} (rejected)`);
+      setControllerQuestionText(`Join rejected. ${reason} Tap Exit and join again with a valid alias.`);
+      setControllerOptionsEnabled(false);
+      gameState.controllerCountdownStop?.();
+      if (gameState.relaySocket) gameState.relaySocket.close();
       break;
     }
     case MSG_TYPES.START_QUESTION: {

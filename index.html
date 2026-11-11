@@ -88,6 +88,26 @@
             <option value="D">D</option>
           </select>
         </label>
+        <!-- Alias rule: host-side, per session; locked once the game leaves the LOBBY. -->
+        <div id="alias-rule" class="alias-rule">
+          <label class="field field--inline">
+            <span class="field__label">Alias rule</span>
+            <select id="input-alias-mode" class="field__input">
+              <option value="any">Any alias</option>
+              <option value="prefix">Student ID prefix</option>
+              <option value="custom">Custom regex</option>
+            </select>
+          </label>
+          <label id="alias-digits-field" class="field field--inline" hidden>
+            <span class="field__label">Digits</span>
+            <input type="number" id="input-alias-digits" class="field__input alias-rule__digits" min="1" max="20" value="10" />
+          </label>
+          <label id="alias-regex-field" class="field field--inline" hidden>
+            <span class="field__label">Regex</span>
+            <input type="text" id="input-alias-regex" class="field__input" placeholder="^\d{10}_.+$" spellcheck="false" />
+          </label>
+          <span id="alias-rule-hint" class="alias-rule__hint" aria-live="polite"></span>
+        </div>
         <button id="btn-toggle-simulator" type="button" class="btn btn--ghost">Simulator: Off</button>
         <button id="btn-start-game" type="button" class="btn btn--primary">Start Game</button>
         <button id="btn-next-question" type="button" class="btn btn--secondary" disabled>Next Question</button>
@@ -176,6 +196,7 @@
 
   <script src="bonus-round.js"></script>
   <script src="questions-public.js"></script>
+  <script src="quiz-rules.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -200,6 +200,31 @@ button {
   font-size: 0.85rem;
 }
 
+.alias-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.alias-rule__digits {
+  width: 4.5em;
+}
+
+.alias-rule__hint {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.alias-rule__hint[data-warning='true'] {
+  color: var(--color-neon-red);
+  opacity: 1;
+}
+
+.board-final-ranking__download {
+  margin-top: var(--spacing-sm);
+}
+
 .field__hint {
   margin: 0;
   font-size: 0.8rem;
