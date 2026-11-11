@@ -118,5 +118,65 @@
       "C": "Un espacio con nombre donde se guarda un dato cambiante",
       "D": "Un programa que se usa para abrir y ver páginas web"
     }
+  },
+  {
+    "id": 13,
+    "text": "Quieres cambiar el color de los títulos de una página. ¿Qué usas?",
+    "options": {
+      "A": "HTML",
+      "B": "JavaScript",
+      "C": "Un servidor",
+      "D": "CSS"
+    }
+  },
+  {
+    "id": 14,
+    "text": "Quieres agregar un párrafo nuevo con texto a una página. ¿Qué usas?",
+    "options": {
+      "A": "HTML",
+      "B": "CSS",
+      "C": "JavaScript",
+      "D": "Un navegador"
+    }
+  },
+  {
+    "id": 15,
+    "text": "Quieres que aparezca un mensaje cuando alguien toca un botón. ¿Qué usas?",
+    "options": {
+      "A": "HTML",
+      "B": "CSS",
+      "C": "JavaScript",
+      "D": "Un servidor"
+    }
+  },
+  {
+    "id": 16,
+    "text": "Quieres cambiar el tipo y el tamaño de las letras de una página. ¿Qué usas?",
+    "options": {
+      "A": "JavaScript",
+      "B": "CSS",
+      "C": "HTML",
+      "D": "Un navegador"
+    }
+  },
+  {
+    "id": 17,
+    "text": "Quieres crear los títulos y las listas con el contenido de una página. ¿Qué usas?",
+    "options": {
+      "A": "CSS",
+      "B": "JavaScript",
+      "C": "Un servidor",
+      "D": "HTML"
+    }
+  },
+  {
+    "id": 18,
+    "text": "Quieres que la página muestre un reloj que cambia cada segundo. ¿Qué usas?",
+    "options": {
+      "A": "JavaScript",
+      "B": "HTML",
+      "C": "CSS",
+      "D": "Un navegador"
+    }
   }
 ]
