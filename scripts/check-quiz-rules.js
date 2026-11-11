@@ -110,4 +110,27 @@ assert.equal(Q.isTargetedElsewhere({ targetStudentId: 'a' }, 'a'), false);
 assert.equal(Q.isTargetedElsewhere({ finalists: [] }, 'a'), false);
 assert.equal(Q.isTargetedElsewhere(undefined, 'a'), false);
 
+// Auto-advance settings + decisions
+const aaDefault = { enabled: true, dwellSec: 8 };
+assert.deepEqual(Q.parseAutoAdvance(null), aaDefault);
+assert.deepEqual(Q.parseAutoAdvance('garbage'), aaDefault);
+assert.deepEqual(Q.parseAutoAdvance('[]'), aaDefault);
+assert.deepEqual(Q.parseAutoAdvance(Q.serializeAutoAdvance({ enabled: false, dwellSec: 15 })), { enabled: false, dwellSec: 15 });
+assert.deepEqual(Q.parseAutoAdvance('{"enabled":"yes","dwellSec":"x"}'), aaDefault);
+assert.equal(Q.clampDwellSec(1), 3);
+assert.equal(Q.clampDwellSec(999), 60);
+assert.equal(Q.clampDwellSec('12'), 12);
+assert.equal(Q.clampDwellSec(''), 8);
+assert.equal(Q.parseAutoAdvance('{"enabled":true,"dwellSec":0}').dwellSec, 3);
+assert.equal(Q.shouldScheduleAutoAdvance({ reason: 'timer', settings: aaDefault }), true);
+assert.equal(Q.shouldScheduleAutoAdvance({ reason: 'manual', settings: aaDefault }), false);
+assert.equal(Q.shouldScheduleAutoAdvance({ reason: 'timer', settings: { enabled: false, dwellSec: 8 } }), false);
+assert.equal(Q.shouldFireAutoAdvance({ currentState: 'LEADERBOARD', settings: aaDefault }), true);
+assert.equal(Q.shouldFireAutoAdvance({ currentState: 'SESSION_END', settings: aaDefault }), false);
+assert.equal(Q.shouldFireAutoAdvance({ currentState: 'ACTIVE_QUESTION', settings: aaDefault }), false);
+assert.equal(Q.shouldFireAutoAdvance({ currentState: 'LEADERBOARD', settings: { enabled: false, dwellSec: 8 } }), false);
+assert.equal(Q.dwellRemainingSec(1000, 8000), 7);
+assert.equal(Q.dwellRemainingSec(1000, 1001), 1);
+assert.equal(Q.dwellRemainingSec(9000, 8000), 0);
+
 console.log('quiz-rules: all checks passed');

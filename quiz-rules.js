@@ -237,7 +237,55 @@
     return Boolean(payload) && payload.targetStudentId !== undefined && payload.targetStudentId !== studentId;
   }
 
-  const api = { reconnectDelayMs, reconnectDecision, isTargetedElsewhere, isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
+  const AUTO_ADVANCE_MIN_SEC = 3;
+  const AUTO_ADVANCE_MAX_SEC = 60;
+  const AUTO_ADVANCE_DEFAULT = { enabled: true, dwellSec: 8 };
+
+  /** Clamps the leaderboard dwell to 3-60 whole seconds (invalid -> default 8). */
+  function clampDwellSec(value) {
+    const n = Number.parseInt(value, 10);
+    if (!Number.isFinite(n)) return AUTO_ADVANCE_DEFAULT.dwellSec;
+    return Math.min(AUTO_ADVANCE_MAX_SEC, Math.max(AUTO_ADVANCE_MIN_SEC, n));
+  }
+
+  function serializeAutoAdvance(settings) {
+    const s = settings || {};
+    return JSON.stringify({ enabled: s.enabled !== false, dwellSec: clampDwellSec(s.dwellSec) });
+  }
+
+  /** Restores stored auto-advance settings; anything invalid -> defaults (ON, 8s). */
+  function parseAutoAdvance(raw) {
+    const fallback = { ...AUTO_ADVANCE_DEFAULT };
+    if (typeof raw !== 'string') return fallback;
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (err) {
+      return fallback;
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return fallback;
+    return {
+      enabled: typeof data.enabled === 'boolean' ? data.enabled : AUTO_ADVANCE_DEFAULT.enabled,
+      dwellSec: clampDwellSec(data.dwellSec),
+    };
+  }
+
+  /** Round just ended: start a dwell only if the TIMER expired and auto-advance is on. */
+  function shouldScheduleAutoAdvance({ reason, settings }) {
+    return reason === 'timer' && Boolean(settings) && settings.enabled === true;
+  }
+
+  /** Dwell elapsed: advance only if still on the leaderboard and still enabled. */
+  function shouldFireAutoAdvance({ currentState, settings }) {
+    return currentState === 'LEADERBOARD' && Boolean(settings) && settings.enabled === true;
+  }
+
+  /** Whole seconds left in the dwell (never negative). */
+  function dwellRemainingSec(now, endsAt) {
+    return Math.max(0, Math.ceil((endsAt - now) / 1000));
+  }
+
+  const api = { clampDwellSec, serializeAutoAdvance, parseAutoAdvance, shouldScheduleAutoAdvance, shouldFireAutoAdvance, dwellRemainingSec, reconnectDelayMs, reconnectDecision, isTargetedElsewhere, isFinalistStalled, serializeAliasConfig, parseAliasConfig, compileAliasRule, splitStudentId, buildResultsCsv, buildResultRows };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.QuizRules = api;
 })(typeof window !== 'undefined' ? window : globalThis);

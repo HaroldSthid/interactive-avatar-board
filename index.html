@@ -108,6 +108,17 @@
           </label>
           <span id="alias-rule-hint" class="alias-rule__hint" aria-live="polite"></span>
         </div>
+        <!-- Auto-advance: after a TIMER-expired question, wait a leaderboard dwell then start the next one. -->
+        <div id="auto-advance" class="alias-rule">
+          <label class="field field--inline">
+            <input type="checkbox" id="input-auto-advance" checked />
+            <span class="field__label">Auto-advance</span>
+          </label>
+          <label class="field field--inline">
+            <span class="field__label">Seconds</span>
+            <input type="number" id="input-auto-advance-seconds" class="field__input alias-rule__digits" min="3" max="60" value="8" />
+          </label>
+        </div>
         <button id="btn-toggle-simulator" type="button" class="btn btn--ghost">Simulator: Off</button>
         <button id="btn-start-game" type="button" class="btn btn--primary">Start Game</button>
         <button id="btn-next-question" type="button" class="btn btn--secondary" disabled>Next Question</button>
@@ -121,6 +132,8 @@
         <div id="board-timer-fill" class="timer-bar__fill"></div>
         <span id="board-timer-count" class="timer-bar__count"></span>
       </div>
+
+      <span id="board-auto-advance" class="badge badge--state" aria-live="polite" hidden></span>
 
       <div id="board-track" class="board-track">
         <div id="board-starting-line" class="board-starting-line" aria-label="Waiting area"></div>

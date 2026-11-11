@@ -248,6 +248,8 @@ const gameState = {
   clientSession: null, // student: { roomId, studentId, avatar, avatarImage, stopped, attempt, timerId } — drives auto-reconnect
   wakeLock: null, // student: active screen WakeLockSentinel, if any
   currentQuestionPayload: null, // host: last START_QUESTION payload, re-sent to a reconnecting student
+  // Auto-advance (host): settings mirror the board-bar inputs; the rest is the pending dwell.
+  autoAdvance: { enabled: true, dwellSec: 8, timeoutId: null, tickId: null, endsAt: null },
   studentId: null, // student: this device's Student ID
   controllerQuestionStartedAt: null, // student: local clock ref for elapsed time
   controllerCurrentQuestionId: null, // student: questionId of the active question
@@ -567,6 +569,7 @@ function drawNextQuestion() {
  * ACTIVE_QUESTION branch of nextQuestion().
  */
 function startNewQuestionRound() {
+  cancelAutoAdvance();
   gameState.questionId += 1;
   gameState.questionStartedAt = Date.now();
   gameState.submissions = [];
@@ -619,7 +622,7 @@ function startNewQuestionRound() {
       // If the host already ended the round manually (or reset/ended the
       // session) before the clock ran out, gameState.current has already
       // moved on — don't double-fire nextQuestion()'s round-end logic.
-      if (gameState.current === GAME_STATES.ACTIVE_QUESTION) nextQuestion();
+      if (gameState.current === GAME_STATES.ACTIVE_QUESTION) nextQuestion('timer');
     },
   });
 }
@@ -634,7 +637,11 @@ function startGame() {
   startNewQuestionRound();
 }
 
-function nextQuestion() {
+/**
+ * @param {string} [reason] - 'timer' when the countdown expired; anything else
+ *   (e.g. the host's button click) is a manual action and never auto-advances.
+ */
+function nextQuestion(reason) {
   if (gameState.current === GAME_STATES.ACTIVE_QUESTION) {
     // Cancel the pending auto-end countdown BEFORE doing the round-end work,
     // so a manual "End Question" click never leaves a stray timer running
@@ -649,15 +656,113 @@ function nextQuestion() {
     awardRoundPoints(leaderboard);
     setGameState(GAME_STATES.LEADERBOARD);
     broadcastToStudents({ type: MSG_TYPES.ROUND_END, payload: { leaderboard, totalScores: gameState.totalScores } });
+    if (window.QuizRules.shouldScheduleAutoAdvance({ reason, settings: gameState.autoAdvance })) {
+      startAutoAdvanceDwell();
+    }
     return;
   }
 
   if (gameState.current === GAME_STATES.LEADERBOARD) {
+    cancelAutoAdvance(); // "Next Question" during the dwell skips the wait, no double advance
     startNewQuestionRound();
   }
 }
 
+// ---------------------------------------------------------------------------
+// Auto-advance: after a timer-expired question, show the leaderboard for a
+// short dwell (visible countdown), then start the next question. Manual
+// "End Question" never schedules this.
+// ---------------------------------------------------------------------------
+
+const AUTO_ADVANCE_STORAGE_KEY = 'autoAdvanceConfig';
+
+function cancelAutoAdvance() {
+  const aa = gameState.autoAdvance;
+  if (aa.timeoutId !== null) clearTimeout(aa.timeoutId);
+  if (aa.tickId !== null) clearInterval(aa.tickId);
+  aa.timeoutId = null;
+  aa.tickId = null;
+  aa.endsAt = null;
+  renderAutoAdvanceLabel();
+}
+
+function renderAutoAdvanceLabel() {
+  const label = document.getElementById('board-auto-advance');
+  if (!label) return;
+  const aa = gameState.autoAdvance;
+  if (aa.endsAt === null) {
+    label.hidden = true;
+    label.textContent = '';
+    return;
+  }
+  label.hidden = false;
+  label.textContent = `Next question in ${window.QuizRules.dwellRemainingSec(Date.now(), aa.endsAt)}s`;
+}
+
+function startAutoAdvanceDwell() {
+  cancelAutoAdvance();
+  const aa = gameState.autoAdvance;
+  const dwellMs = aa.dwellSec * 1000;
+  aa.endsAt = Date.now() + dwellMs;
+  aa.tickId = window.setInterval(renderAutoAdvanceLabel, 250);
+  aa.timeoutId = window.setTimeout(() => {
+    const stillValid = window.QuizRules.shouldFireAutoAdvance({
+      currentState: gameState.current,
+      settings: gameState.autoAdvance,
+    });
+    cancelAutoAdvance();
+    if (stillValid) startNewQuestionRound();
+  }, dwellMs);
+  renderAutoAdvanceLabel();
+}
+
+function saveAutoAdvanceSettings() {
+  try {
+    localStorage.setItem(AUTO_ADVANCE_STORAGE_KEY, window.QuizRules.serializeAutoAdvance(gameState.autoAdvance));
+  } catch (err) {
+    // Storage unavailable: settings still apply for this session.
+  }
+}
+
+function initAutoAdvanceControls() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(AUTO_ADVANCE_STORAGE_KEY);
+  } catch (err) {
+    raw = null;
+  }
+  const stored = window.QuizRules.parseAutoAdvance(raw);
+  gameState.autoAdvance.enabled = stored.enabled;
+  gameState.autoAdvance.dwellSec = stored.dwellSec;
+
+  const toggle = document.getElementById('input-auto-advance');
+  const seconds = document.getElementById('input-auto-advance-seconds');
+  if (toggle) toggle.checked = stored.enabled;
+  if (seconds) seconds.value = stored.dwellSec;
+
+  const apply = () => {
+    const aa = gameState.autoAdvance;
+    const wasPending = aa.endsAt !== null;
+    aa.enabled = toggle ? toggle.checked : aa.enabled;
+    aa.dwellSec = window.QuizRules.clampDwellSec(seconds ? seconds.value : aa.dwellSec);
+    saveAutoAdvanceSettings();
+    if (!wasPending) return;
+    // A pending dwell: cancel when turned off, otherwise restart with the new length.
+    if (aa.enabled) startAutoAdvanceDwell();
+    else cancelAutoAdvance();
+  };
+  if (toggle) toggle.addEventListener('change', apply);
+  if (seconds) {
+    seconds.addEventListener('input', apply);
+    seconds.addEventListener('change', () => {
+      seconds.value = window.QuizRules.clampDwellSec(seconds.value);
+      apply();
+    });
+  }
+}
+
 function resetGame() {
+  cancelAutoAdvance();
   gameState.hostCountdownStop?.();
   clearPendingSimulatorTimers();
   // Note: the host no longer holds individual student sockets (the relay
@@ -1256,6 +1361,7 @@ function awardRoundPoints(leaderboard) {
 function endSession() {
   if (gameState.current === GAME_STATES.LOBBY) return;
 
+  cancelAutoAdvance();
   // "Finalizar sesión" can be clicked mid-round (ACTIVE_QUESTION) — cancel
   // any pending auto-end countdown so it can't fire nextQuestion() after the
   // session has already moved to SESSION_END.
@@ -1393,6 +1499,7 @@ function initDashboardControls() {
   }
 
   initAliasRuleControls();
+  initAutoAdvanceControls();
   renderDashboard();
   renderRoster();
 }
@@ -1708,6 +1815,7 @@ function initHostSocket(attempt = 0) {
  * duplicate on the next "Start Hosting".
  */
 function destroyHostSocket() {
+  cancelAutoAdvance();
   if (gameState.hostSocket) {
     gameState.hostSocket.close();
     gameState.hostSocket = null;
@@ -2381,6 +2489,7 @@ function startBonusRound() {
   // entering a bonus round that can never auto-finalize.
   if (finalists.length === 0) return;
 
+  cancelAutoAdvance();
   gameState.bonusFinalists = finalists;
   gameState.bonusScores = {};
   gameState.bonusLastSeen = {};

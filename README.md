@@ -10,7 +10,7 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 2. Click en **"Start Hosting"**.
 3. Compartí el **Room ID** que se genera (decilo en voz alta o proyectalo) para que los estudiantes lo usen al unirse.
 4. Opcional: click en **"Simulator: On"** para armar una demo/prueba rápida con estudiantes simulados, sin necesitar conexiones reales.
-5. Click en **"Start Game"** para arrancar la primera pregunta del banco. Cada pregunta tiene un **cronómetro de 20 segundos** (barra que se va vaciando, con tick-tock y alarma) — si llega a 0, la ronda termina sola, con el mismo efecto que clickear "Next Question" a mano.
+5. Click en **"Start Game"** para arrancar la primera pregunta del banco. Cada pregunta tiene un **cronómetro de 20 segundos** (barra que se va vaciando, con tick-tock y alarma). Si llega a 0, la ronda termina sola, se muestra el leaderboard unos segundos (8 por defecto, con una cuenta regresiva "Next question in Ns") y **pasa sola a la siguiente pregunta**. Podés apagar esto o cambiar los segundos (3 a 60) con el control **"Auto-advance"** de la barra del host.
 6. Click en **"Next Question"** para avanzar a la siguiente pregunta (también corta el cronómetro si todavía estaba corriendo).
 7. Click en **"Finalizar sesión"** en cualquier momento (excepto en LOBBY) para cerrar la sesión y mostrar el ranking final acumulado, tanto en el board como en el celular de cada estudiante.
 8. Click en **"Reset"** para reiniciar toda la sesión (vuelve al banco de preguntas desde el principio y borra el puntaje acumulado), incluso después de "Finalizar sesión".
@@ -20,7 +20,7 @@ Juego de preguntas en vivo tipo "carrera de avatares": el docente hostea una sal
 Son botones distintos para fases distintas — no se reemplazan entre sí:
 
 1. **Start Game** — arranca el quiz (solo funciona desde el lobby).
-2. **End Question / Next Question** — es el mismo botón: durante la pregunta termina la ronda y muestra el leaderboard; después, pasa a la siguiente. Cuando se acaba el cronómetro la pregunta termina sola, pero **no avanza sola**: hay que clickear "Next Question".
+2. **End Question / Next Question** — es el mismo botón: durante la pregunta termina la ronda y muestra el leaderboard; después, pasa a la siguiente. Cuando se acaba el cronómetro la pregunta termina sola y, con **Auto-advance** prendido (por defecto), pasa sola a la siguiente después de unos segundos de leaderboard. Si terminás la pregunta a mano con "End Question" **nunca avanza sola** (el control es tuyo), y clickear "Next Question" durante la espera salta el tiempo restante.
 3. **Finalizar sesión** — cierra el quiz y muestra el ranking final.
 4. **Start Bonus Round** — se habilita solo después de "Finalizar sesión"; lanza el juego para los finalistas (se juega tocando la pantalla del celular para saltar).
 5. **Download results** — descarga el CSV, desde el ranking final o desde los resultados del bonus.
